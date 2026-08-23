@@ -1,9 +1,19 @@
+import dns from 'dns';
+try {
+  if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+  }
+} catch {
+  // ignore
+}
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { config } from './config/env.js';
 import { getDb } from './db/db.js';
+import { macroAnalyticsService } from './services/macro-analytics.service.js';
 import apiRouter from './routes/index.js';
 import { logger } from './utils/logger.js';
 
@@ -92,6 +102,11 @@ function startServer() {
       if (fs.existsSync(clientDistPath)) {
         logger.info(`💻 Frontend served at http://localhost:${config.port}`);
       }
+
+      // Pre-compute macro indicators in background
+      macroAnalyticsService.getDashboard().catch((err) => {
+        logger.warn(`Initial macro dashboard pre-computation failed: ${err.message}`);
+      });
     });
 
     // Graceful shutdown handling

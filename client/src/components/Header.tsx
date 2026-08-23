@@ -1,10 +1,11 @@
 import React from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Activity } from 'lucide-react';
 import { SearchBar } from './SearchBar';
 
 interface HeaderProps {
   onAssetAdded: () => void;
   onBatchGenerate: () => void;
+  onOpenMacro: () => void;
   isBatchLoading: boolean;
   totalAssets: number;
 }
@@ -12,6 +13,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onAssetAdded,
   onBatchGenerate,
+  onOpenMacro,
   isBatchLoading,
   totalAssets,
 }) => {
@@ -41,9 +43,21 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Centered Search Bar */}
-          <div className="flex-1 flex justify-center max-w-xl mx-auto">
-            <SearchBar onAssetAdded={onAssetAdded} />
+          {/* Centered Search Bar & Macro Button */}
+          <div className="flex-1 flex justify-center max-w-2xl mx-auto">
+            <div className="flex items-center gap-2.5 w-full">
+              <div className="flex-1">
+                <SearchBar onAssetAdded={onAssetAdded} />
+              </div>
+              <button
+                onClick={onOpenMacro}
+                title="Open Global Macro Intelligence & Regime Dashboard"
+                className="flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-slate-200 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 hover:border-indigo-500/50 rounded-xl transition shadow-sm whitespace-nowrap cursor-pointer shrink-0"
+              >
+                <Activity className="w-4 h-4 text-indigo-400" />
+                <span className="hidden sm:inline">Macro Health</span>
+              </button>
+            </div>
           </div>
 
           {/* Actions & Health Status */}

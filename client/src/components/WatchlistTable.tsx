@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { TrackedAsset, Timeframe } from '../types/asset';
 import { apiClient } from '../api/client';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, getAssetTypeBadgeColor } from '../utils/formatters';
 
 export type TimeArc = '1D' | '1W' | '1M' | '6M' | '1Y' | 'YTD';
 
@@ -125,19 +125,6 @@ export const WatchlistTable: React.FC<WatchlistTableProps> = ({
 
   const formatPrice = (price: number, currency: string) => {
     return formatCurrency(price, currency, 2);
-  };
-
-  const getAssetTypeBadgeColor = (type: string) => {
-    switch (type?.toUpperCase()) {
-      case 'ETF':
-        return 'bg-blue-900/40 text-blue-300 border-blue-700/50';
-      case 'INDEX':
-        return 'bg-purple-900/40 text-purple-300 border-purple-700/50';
-      case 'COMMODITY':
-        return 'bg-amber-900/40 text-amber-300 border-amber-700/50';
-      default:
-        return 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50';
-    }
   };
 
   const getChangeForAsset = (asset: TrackedAsset): { changePct: number; isPending: boolean } => {

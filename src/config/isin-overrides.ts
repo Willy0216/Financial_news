@@ -42,6 +42,15 @@ export const ISIN_OVERRIDES: Record<string, string> = {
   'US30303M1027': 'META',       // Meta Platforms Inc.
 };
 
+// Known European & Milan Tickers that Yahoo Finance maps under different exchange suffixes
+export const TICKER_MARKET_ALIASES: Record<string, string> = {
+  'BITC.MI': 'BITC.L',    // CoinShares Physical Bitcoin (Milan -> London on Yahoo)
+  'BTCW.MI': 'BTCW.SW',   // WisdomTree Physical Bitcoin (Milan -> SIX Swiss)
+  'BTCE.MI': 'BTCE.DE',   // Bitwise Physical Bitcoin (Milan -> XETRA EUR)
+  '21BC.MI': '21BC.DE',   // 21Shares Bitcoin (Milan -> XETRA EUR)
+  'FBTC.MI': 'FBTC.SW',   // Fidelity Physical Bitcoin (Milan -> SIX Swiss)
+};
+
 // Reverse mapping for Symbol -> ISIN
 export const SYMBOL_TO_ISIN: Record<string, string> = Object.entries(ISIN_OVERRIDES).reduce(
   (acc, [isin, symbol]) => {
@@ -55,3 +64,4 @@ export const SYMBOL_TO_ISIN: Record<string, string> = Object.entries(ISIN_OVERRI
   },
   {} as Record<string, string>
 );
+

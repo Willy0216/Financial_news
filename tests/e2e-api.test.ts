@@ -1,9 +1,11 @@
 process.env.NODE_ENV = 'test';
 import http from 'http';
+import path from 'path';
+import fs from 'fs';
 import axios from 'axios';
-import app from '../src/index.js';
-import { getDb } from '../src/db/db.js';
-import { reportRepository } from '../src/db/repositories/report.repository.js';
+
+const testDbPath = path.resolve(process.cwd(), 'data', 'test_e2e.db');
+process.env.DATABASE_PATH = testDbPath;
 
 let server: http.Server;
 let API_BASE = '';
@@ -22,6 +24,10 @@ function assert(condition: boolean, testName: string, detail?: any) {
 }
 
 async function runE2ETests() {
+  const { default: app } = await import('../src/index.js');
+  const { getDb, closeDb } = await import('../src/db/db.js');
+  const { config } = await import('../src/config/env.js');
+  const { reportRepository } = await import('../src/db/repositories/report.repository.js');
   console.log('\n=============================================');
   console.log('🌐 RUNNING END-TO-END REST API TESTS');
   console.log('=============================================\n');
@@ -87,11 +93,16 @@ async function runE2ETests() {
     const listRes = await axios.get(`${API_BASE}/assets`);
     assert(listRes.status === 200, 'GET /api/assets returns 200 OK');
     assert(listRes.data.count === 2, `GET /api/assets returns 2 tracked assets (got ${listRes.data.count})`);
+    assert(Boolean(listRes.data.data[0]?.profile), 'Assets in list contain underlying profile data');
 
     // 7. Get Single Asset (GET /api/assets/:symbol)
     const getRes = await axios.get(`${API_BASE}/assets/AAPL`);
     assert(getRes.status === 200, 'GET /api/assets/AAPL returns 200 OK');
     assert(getRes.data.data.symbol === 'AAPL', 'Returns asset AAPL details');
+    assert(
+      Boolean(getRes.data.data.profile?.sector && getRes.data.data.profile?.summary),
+      'Single asset response contains parsed equity profile metadata'
+    );
 
     // 8. Test Caching in Report Generation (POST /api/assets/:symbol/report)
     console.log('\n--- 4. Report Generation & Caching Endpoints ---');
@@ -114,13 +125,19 @@ async function runE2ETests() {
     assert(reportsListRes.status === 200, 'GET /api/assets/AAPL/reports returns 200 OK');
     assert(reportsListRes.data.count >= 1, 'Returns array of historical reports');
 
-    // 10. Batch Reports (POST /api/reports/batch)
+    // 10. Get Populated Prompt (GET /api/assets/:symbol/prompt)
+    const promptRes = await axios.get(`${API_BASE}/assets/AAPL/prompt`);
+    assert(promptRes.status === 200, 'GET /api/assets/AAPL/prompt returns 200 OK');
+    assert(typeof promptRes.data.prompt === 'string' && promptRes.data.prompt.includes('AAPL'), 'Populated prompt contains symbol AAPL');
+    assert(promptRes.data.prompt.includes('Instrument Metadata'), 'Populated prompt contains Instrument Metadata section');
+
+    // 11. Batch Reports (POST /api/reports/batch)
     const batchRes = await axios.post(`${API_BASE}/reports/batch`);
     assert(batchRes.status === 200, 'POST /api/reports/batch returns 200 OK');
     assert(batchRes.data.data.total === 2, 'Batch report processed all 2 tracked assets');
     assert(batchRes.data.data.cached >= 1, 'Batch report detected cached report');
 
-    // 11. Delete Asset (DELETE /api/assets/:symbol)
+    // 12. Delete Asset (DELETE /api/assets/:symbol)
     console.log('\n--- 5. Delete Asset Endpoint ---');
     const deleteRes = await axios.delete(`${API_BASE}/assets/AAPL`);
     assert(deleteRes.status === 200, 'DELETE /api/assets/AAPL returns 200 OK');
@@ -131,6 +148,14 @@ async function runE2ETests() {
     assert(false, 'E2E Test encountered exception', err.response?.data || err.message);
   } finally {
     server.close();
+    closeDb();
+    if (config.databasePath && config.databasePath !== ':memory:' && fs.existsSync(config.databasePath)) {
+      try {
+        fs.unlinkSync(config.databasePath);
+      } catch {
+        // ignore
+      }
+    }
   }
 
   console.log('\n=============================================');

@@ -1,7 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, RefreshCw, Clock, CheckCircle2, ShieldAlert, Cpu } from 'lucide-react';
+import {
+  Sparkles,
+  RefreshCw,
+  Clock,
+  CheckCircle2,
+  ShieldAlert,
+  Cpu,
+  Edit3,
+  X,
+  RotateCcw,
+  Copy,
+  Check,
+  Code2,
+} from 'lucide-react';
 import { useAIReport } from '../hooks/useAIReport';
+import { apiClient } from '../api/client';
 
 interface AIReportPanelProps {
   symbol: string;
@@ -11,14 +25,89 @@ interface AIReportPanelProps {
 export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) => {
   const { report, loading, refreshing, error, fetchReport } = useAIReport(symbol);
 
+  // Edit Prompt State
+  const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
+  const [promptText, setPromptText] = useState<string>('');
+  const [loadingPrompt, setLoadingPrompt] = useState<boolean>(false);
+  const [copiedPrompt, setCopiedPrompt] = useState<boolean>(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+
+  // Helper to parse UTC timestamps from various formats (SQLite UTC strings without Z, ISO strings, etc.)
+  const parseUtcDate = (dateStr?: string): Date => {
+    if (!dateStr) return new Date();
+    let s = String(dateStr).trim();
+    if (!s.includes('T') && s.includes(' ')) {
+      s = s.replace(' ', 'T');
+    }
+    if (!s.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(s)) {
+      s = s + 'Z';
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? new Date(dateStr) : d;
+  };
+
+  // Format timestamp strictly to Europe/Rome timezone
   const formatTimestamp = (dateStr?: string) => {
     if (!dateStr) return 'Just now';
     try {
-      const date = new Date(dateStr);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' });
+      const date = parseUtcDate(dateStr);
+      const timeStr = date.toLocaleTimeString('en-GB', {
+        timeZone: 'Europe/Rome',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const datePart = date.toLocaleDateString('en-GB', {
+        timeZone: 'Europe/Rome',
+        month: 'short',
+        day: 'numeric',
+      });
+      return `${datePart}, ${timeStr} (Rome)`;
     } catch {
       return dateStr;
     }
+  };
+
+  const handleOpenEditPrompt = async () => {
+    setIsEditingPrompt(true);
+    setPromptError(null);
+
+    if (!promptText) {
+      setLoadingPrompt(true);
+      try {
+        const defaultPrompt = await apiClient.getPopulatedPrompt(symbol);
+        setPromptText(defaultPrompt);
+      } catch (err: any) {
+        setPromptError(err.message || 'Failed to load populated prompt.');
+      } finally {
+        setLoadingPrompt(false);
+      }
+    }
+  };
+
+  const handleResetPrompt = async () => {
+    setLoadingPrompt(true);
+    setPromptError(null);
+    try {
+      const defaultPrompt = await apiClient.getPopulatedPrompt(symbol);
+      setPromptText(defaultPrompt);
+    } catch (err: any) {
+      setPromptError(err.message || 'Failed to reset prompt.');
+    } finally {
+      setLoadingPrompt(false);
+    }
+  };
+
+  const handleCopyPrompt = () => {
+    if (promptText) {
+      navigator.clipboard.writeText(promptText);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2000);
+    }
+  };
+
+  const handleGenerateCustom = async () => {
+    setIsEditingPrompt(false);
+    await fetchReport(true, promptText.trim());
   };
 
   const modelName = report?.modelUsed || report?.model_used;
@@ -49,8 +138,8 @@ export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) =>
           </div>
         </div>
 
-        {/* Status / Timestamp & Refresh Button */}
-        <div className="flex items-center gap-3">
+        {/* Status / Timestamp & Actions */}
+        <div className="flex flex-wrap items-center gap-2.5">
           {report?.createdAt && (
             <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-800/80 px-2.5 py-1 rounded-lg border border-gray-700/60 font-mono">
               <Clock className="w-3.5 h-3.5 text-gray-400" />
@@ -60,6 +149,18 @@ export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) =>
             </div>
           )}
 
+          {/* Edit Prompt Button */}
+          <button
+            onClick={handleOpenEditPrompt}
+            disabled={loading || refreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-200 hover:text-white text-xs font-semibold border border-gray-700 transition-all cursor-pointer shadow-sm"
+            title="View and edit the populated Gemini prompt"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Edit Prompt</span>
+          </button>
+
+          {/* Refresh Analysis Button */}
           <button
             onClick={() => fetchReport(true)}
             disabled={loading || refreshing}
@@ -70,6 +171,114 @@ export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) =>
           </button>
         </div>
       </div>
+
+      {/* Edit Prompt Modal / Overlay */}
+      {isEditingPrompt && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-3xl bg-[#0F172A] border border-gray-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-800 bg-gray-900/80 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-950/80 border border-indigo-700/50 rounded-xl text-indigo-400">
+                  <Code2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-100">
+                    Customize Gemini Prompt for {name} ({symbol})
+                  </h4>
+                  <p className="text-xs text-gray-400">
+                    Live variables, pricing, and news are populated below. Edit freely and re-generate.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsEditingPrompt(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {loadingPrompt ? (
+                <div className="py-20 flex flex-col items-center justify-center space-y-3 text-center">
+                  <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                  <p className="text-xs text-gray-400">Loading populated prompt template...</p>
+                </div>
+              ) : promptError ? (
+                <div className="p-4 rounded-xl bg-red-950/40 border border-red-800 text-red-300 text-xs">
+                  {promptError}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span className="font-mono text-[11px] text-gray-400">
+                      Characters: {promptText.length} | Lines: {promptText.split('\n').length}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleCopyPrompt}
+                        className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
+                      >
+                        {copiedPrompt ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3 text-gray-400" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={handleResetPrompt}
+                        className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
+                        title="Reset to default populated template"
+                      >
+                        <RotateCcw className="w-3 h-3 text-gray-400" />
+                        <span>Reset Default</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <textarea
+                    value={promptText}
+                    onChange={(e) => setPromptText(e.target.value)}
+                    rows={16}
+                    className="w-full bg-[#050B14] border border-gray-700/80 rounded-xl p-4 font-mono text-xs text-gray-200 leading-relaxed focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-inner resize-y"
+                    placeholder="Enter customized prompt instructions..."
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="p-4 border-t border-gray-800 bg-gray-900/60 flex items-center justify-between gap-3">
+              <button
+                onClick={() => setIsEditingPrompt(false)}
+                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-semibold transition-colors"
+              >
+                Close Tab
+              </button>
+
+              <button
+                onClick={handleGenerateCustom}
+                disabled={loadingPrompt || !promptText.trim()}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Re-generate Analysis</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Report Content Body */}
       <div className="mt-5">
@@ -94,12 +303,20 @@ export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) =>
             <div>
               <p className="font-semibold">Unable to Generate Analysis</p>
               <p className="text-xs text-red-400/90 mt-1">{error}</p>
-              <button
-                onClick={() => fetchReport(true)}
-                className="mt-3 px-3 py-1 bg-red-900/60 hover:bg-red-800/60 text-red-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Retry Generation
-              </button>
+              <div className="flex items-center gap-2 mt-3">
+                <button
+                  onClick={() => fetchReport(true)}
+                  className="px-3 py-1 bg-red-900/60 hover:bg-red-800/60 text-red-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Retry Generation
+                </button>
+                <button
+                  onClick={handleOpenEditPrompt}
+                  className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-gray-700"
+                >
+                  Edit Prompt
+                </button>
+              </div>
             </div>
           </div>
         ) : report?.isHoliday || (report?.status === 'skipped_zero_change' && !report.reportMarkdown) ? (
@@ -110,12 +327,20 @@ export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) =>
               <p className="text-xs text-gray-400 mt-1">
                 The market recorded a 0.00% price change or was closed during the latest session. AI report generation was skipped to prevent redundant token consumption.
               </p>
-              <button
-                onClick={() => fetchReport(true)}
-                className="mt-3 px-3 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Force Generate Anyway
-              </button>
+              <div className="flex items-center gap-2 mt-3">
+                <button
+                  onClick={() => fetchReport(true)}
+                  className="px-3 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Force Generate Anyway
+                </button>
+                <button
+                  onClick={handleOpenEditPrompt}
+                  className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-gray-700"
+                >
+                  Edit Prompt
+                </button>
+              </div>
             </div>
           </div>
         ) : report?.reportMarkdown ? (
@@ -133,8 +358,22 @@ export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) =>
             </div>
           </div>
         ) : (
-          <div className="py-8 text-center text-sm text-gray-400">
-            No report available. Click "Refresh Analysis" to generate one.
+          <div className="py-8 text-center text-sm text-gray-400 flex flex-col items-center gap-3">
+            <p>No report available for {symbol}.</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fetchReport(true)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition-colors"
+              >
+                Generate Analysis
+              </button>
+              <button
+                onClick={handleOpenEditPrompt}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-semibold transition-colors border border-gray-700"
+              >
+                Edit Prompt First
+              </button>
+            </div>
           </div>
         )}
       </div>

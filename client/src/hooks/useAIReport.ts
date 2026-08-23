@@ -24,10 +24,10 @@ export function useAIReport(symbol: string, initialFetch = true) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchReport = useCallback(
-    async (refresh = false) => {
+    async (refresh = false, customPrompt?: string) => {
       if (!cleanSymbol) return;
 
-      if (refresh) {
+      if (refresh || customPrompt) {
         setRefreshing(true);
       } else {
         // If we already have session cache, use it immediately
@@ -42,7 +42,7 @@ export function useAIReport(symbol: string, initialFetch = true) {
       setError(null);
 
       try {
-        const res = await apiClient.getReport(cleanSymbol, refresh);
+        const res = await apiClient.getReport(cleanSymbol, refresh || Boolean(customPrompt), customPrompt);
         reportSessionCache.set(cleanSymbol, res);
         setReport(res);
       } catch (err: any) {

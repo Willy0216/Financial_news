@@ -12,12 +12,14 @@ import { TrackedAsset } from './types/asset';
 import { Header } from './components/Header';
 import { WatchlistTable, TimeArc } from './components/WatchlistTable';
 import { AssetDetailModal } from './components/AssetDetailModal';
+import { MacroDashboardModal } from './components/MacroDashboardModal';
 
 export const App: React.FC = () => {
   const [assets, setAssets] = useState<TrackedAsset[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedAsset, setSelectedAsset] = useState<TrackedAsset | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
+  const [isMacroOpen, setIsMacroOpen] = useState<boolean>(false);
   const [isBatchLoading, setIsBatchLoading] = useState<boolean>(false);
   const [selectedTimeArc, setSelectedTimeArc] = useState<TimeArc>('1D');
   const [notification, setNotification] = useState<{
@@ -105,6 +107,7 @@ export const App: React.FC = () => {
       <Header
         onAssetAdded={handleAssetAdded}
         onBatchGenerate={handleBatchGenerate}
+        onOpenMacro={() => setIsMacroOpen(true)}
         isBatchLoading={isBatchLoading}
         totalAssets={assets.length}
       />
@@ -230,6 +233,12 @@ export const App: React.FC = () => {
           setIsDetailOpen(false);
           setSelectedAsset(null);
         }}
+      />
+
+      {/* Global Macro Intelligence & Regime Modal */}
+      <MacroDashboardModal
+        isOpen={isMacroOpen}
+        onClose={() => setIsMacroOpen(false)}
       />
     </div>
   );

@@ -79,12 +79,24 @@ function initializeNativeOrNodeSqlite(dbPath: string): IDatabase {
   }
 }
 
-export function getDb(): IDatabase {
+export function getDb(customPath?: string): IDatabase {
   if (!dbInstance) {
-    dbInstance = initializeNativeOrNodeSqlite(config.databasePath);
+    const targetPath = customPath || config.databasePath;
+    dbInstance = initializeNativeOrNodeSqlite(targetPath);
     initSchema(dbInstance);
   }
   return dbInstance;
+}
+
+export function closeDb(): void {
+  if (dbInstance) {
+    try {
+      dbInstance.close();
+    } catch {
+      // Ignore close error
+    }
+    dbInstance = null;
+  }
 }
 
 export function initSchema(db: IDatabase): void {
@@ -97,6 +109,7 @@ export function initSchema(db: IDatabase): void {
         asset_type TEXT NOT NULL,          -- "ETF", "EQUITY", "INDEX", "COMMODITY"
         exchange TEXT,                     -- e.g. "MIL", "GER", "LSE", "NMS"
         currency TEXT DEFAULT 'EUR',
+        underlying_data TEXT,              -- JSON serialized metadata & holdings
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -121,6 +134,13 @@ export function initSchema(db: IDatabase): void {
   // Migration for existing tables missing model_used
   try {
     db.exec('ALTER TABLE asset_reports ADD COLUMN model_used TEXT;');
+  } catch {
+    // Column already exists or table freshly created
+  }
+
+  // Migration for existing tables missing underlying_data
+  try {
+    db.exec('ALTER TABLE tracked_assets ADD COLUMN underlying_data TEXT;');
   } catch {
     // Column already exists or table freshly created
   }

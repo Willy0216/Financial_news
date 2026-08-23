@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, Plus, Check, AlertCircle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { ResolveResult } from '../types/asset';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, getAssetTypeBadgeColor } from '../utils/formatters';
 
 interface SearchBarProps {
   onAssetAdded: () => void;
@@ -113,7 +113,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onAssetAdded }) => {
           onFocus={() => {
             if (query.trim()) setIsOpen(true);
           }}
-          placeholder="Search by Ticker (e.g. BITC, SWDA, AAPL) or ISIN (e.g. US0378331005)..."
+          placeholder="Search by Ticker (CSSPX, MEUD) or ISIN (IE00B5BMR087)"
           className="w-full pl-10 pr-4 py-2.5 bg-gray-900/90 border border-gray-700/80 rounded-xl text-sm text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all shadow-inner"
         />
 
@@ -195,7 +195,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onAssetAdded }) => {
                               {item.exchange}
                             </span>
                           )}
-                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-indigo-950/80 text-indigo-400 border border-indigo-800/60">
+                          <span
+                            className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${getAssetTypeBadgeColor(
+                              item.assetType || 'EQUITY'
+                            )}`}
+                          >
                             {item.assetType || 'EQUITY'}
                           </span>
                           {item.currency && (

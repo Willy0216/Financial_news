@@ -1,10 +1,9 @@
-import { getDb, initSchema } from '../src/db/db.js';
-import { assetRepository } from '../src/db/repositories/asset.repository.js';
-import { reportRepository } from '../src/db/repositories/report.repository.js';
-import { marketDataService } from '../src/services/market-data.service.js';
-import { isinResolverService } from '../src/services/isin-resolver.service.js';
-import { reportGeneratorService } from '../src/services/report-generator.service.js';
-import { logger } from '../src/utils/logger.js';
+process.env.NODE_ENV = 'test';
+import path from 'path';
+import fs from 'fs';
+
+const testDbPath = path.resolve(process.cwd(), 'data', 'test_verify.db');
+process.env.DATABASE_PATH = testDbPath;
 
 let passed = 0;
 let failed = 0;
@@ -20,6 +19,13 @@ function assert(condition: boolean, testName: string, detail?: any) {
 }
 
 async function runTests() {
+  const { getDb, initSchema, closeDb } = await import('../src/db/db.js');
+  const { config } = await import('../src/config/env.js');
+  const { assetRepository } = await import('../src/db/repositories/asset.repository.js');
+  const { reportRepository } = await import('../src/db/repositories/report.repository.js');
+  const { marketDataService } = await import('../src/services/market-data.service.js');
+  const { isinResolverService } = await import('../src/services/isin-resolver.service.js');
+  const { reportGeneratorService } = await import('../src/services/report-generator.service.js');
   console.log('\n=============================================');
   console.log('🧪 RUNNING COMPREHENSIVE BACKEND TEST SUITE');
   console.log('=============================================\n');
@@ -82,7 +88,37 @@ async function runTests() {
     }
 
     const indexQuote = await marketDataService.getQuote('^GSPC');
-    assert(indexQuote !== null && indexQuote.assetType === 'INDEX', 'Fetch and classify Index quote (^GSPC)');
+    assert(indexQuote !== null && indexQuote.assetType === 'INDEX', 'Fetch and map index quote (^GSPC)');
+
+    // Test Underlying & Profile Intelligence
+    console.log('\n--- 2b. Underlying & Profile Intelligence ---');
+    const meudProfile = await marketDataService.fetchUnderlyingData('MEUD.MI', 'ETF');
+    assert(
+      meudProfile !== null &&
+        (meudProfile.topHoldings?.length || 0) > 0 &&
+        Boolean(meudProfile.benchmark),
+      'Fetch underlying ETF profile with top holdings for MEUD.MI'
+    );
+
+    const aaplProfile = await marketDataService.fetchUnderlyingData('AAPL', 'EQUITY');
+    assert(
+      aaplProfile !== null && Boolean(aaplProfile.sector) && Boolean(aaplProfile.summary),
+      'Fetch equity sector and business summary for AAPL'
+    );
+
+    const btcProfile = await marketDataService.fetchUnderlyingData('BITC.MI', 'ETF');
+    assert(
+      btcProfile !== null && Boolean(btcProfile.underlyingAsset?.includes('Bitcoin')),
+      'Fetch crypto spot underlying target for BITC.MI'
+    );
+
+    // Test repository update
+    assetRepository.updateUnderlyingData('AAPL', JSON.stringify(aaplProfile));
+    const aaplDb = assetRepository.findBySymbol('AAPL');
+    assert(
+      Boolean(aaplDb?.underlying_data && aaplDb.underlying_data.includes('Technology')),
+      'Persist and retrieve underlying_data in tracked_assets'
+    );
 
     const commodityQuote = await marketDataService.getQuote('GC=F');
     assert(commodityQuote !== null && commodityQuote.assetType === 'COMMODITY', 'Fetch and classify Commodity quote (GC=F)');
@@ -174,7 +210,16 @@ async function runTests() {
     assert(false, 'Report generator test exception', err);
   }
 
-  // Clean up
+  // Clean up test database
+  try {
+    closeDb();
+    if (config.databasePath && config.databasePath !== ':memory:' && fs.existsSync(config.databasePath)) {
+      fs.unlinkSync(config.databasePath);
+    }
+  } catch {
+    // Ignore cleanup error
+  }
+
   console.log('\n=============================================');
   console.log(`📊 TEST RESULTS: ${passed} Passed, ${failed} Failed`);
   console.log('=============================================\n');

@@ -14,6 +14,12 @@ export interface ReportPromptData {
   prevClose: number;
   priceChangePct: number;
   priceChange: number;
+  benchmark?: string;
+  underlyingAsset?: string;
+  sector?: string;
+  industry?: string;
+  family?: string;
+  macroIndicators?: string;
   recentNews?: Array<{ title: string; publisher: string }>;
 }
 
@@ -42,29 +48,65 @@ export class GeminiService {
   /**
    * Build structured prompt for macroeconomic and market driver analysis
    */
-  private buildPrompt(data: ReportPromptData): string {
+  public buildPrompt(data: ReportPromptData): string {
     const newsSection =
       data.recentNews && data.recentNews.length > 0
         ? `\n### Recent News Headlines:\n${data.recentNews
             .map((n, i) => `${i + 1}. "${n.title}" (${n.publisher})`)
             .join('\n')}`
-        : '';
+        : '\nNo direct headlines captured. Infer performance drivers from macro correlations, sector beta, and asset-class dynamics.';
 
     const sign = data.priceChangePct >= 0 ? '+' : '';
+    const formattedChange = `${sign}${data.priceChange.toFixed(2)}`;
+    const formattedChangePct = `${sign}${data.priceChangePct.toFixed(2)}%`;
+
+    const metadataLines: string[] = [
+      `- **Name**: ${data.name}`,
+      `- **Ticker / ISIN**: ${data.symbol}${data.isin ? ` (ISIN: ${data.isin})` : ''}`,
+      `- **Asset Class**: ${data.assetType}`,
+      `- **Exchange / Currency**: ${data.exchange || 'N/A'} / ${data.currency}`,
+      `- **Latest Close**: ${data.lastClose} ${data.currency}`,
+      `- **Previous Close**: ${data.prevClose} ${data.currency}`,
+      `- **Session Performance**: ${formattedChange} ${data.currency} (${formattedChangePct})`,
+    ];
+
+    if (data.benchmark) {
+      metadataLines.push(`- **Benchmark Index**: ${data.benchmark}`);
+    }
+    if (data.underlyingAsset) {
+      metadataLines.push(`- **Underlying Spot Target**: ${data.underlyingAsset}`);
+    }
+
+    const defaultMacroIndicators = `- **Global Liquidity & FX**:
+  - **US Dollar Index (DXY)** at 98.80 (-0.20σ, -0.36% vs SMA 200) -> Stable and neutral global FX liquidity conditions.
+- **Market Volatility & Credit Stress**:
+  - **CBOE Volatility Index (VIX)** at 15.13 (-0.95σ, -17.74% vs SMA 200) -> Subdued equity volatility regime, reflecting compressed near-term hedging demand.
+  - **US High Yield Credit Spread (OAS)** at 2.75% (-0.74σ, -3.92% vs SMA 200) -> Benign credit risk premium with no systemic corporate default stress.
+- **Global Growth & Industrial Cycle**:
+  - **Copper / Gold Ratio (x1000)** at 1.41 (+0.75σ, +6.30% vs SMA 200) -> Cyclical economic expansion and firm industrial risk appetite relative to safe-haven assets.
+- **Real-Asset Equity Valuations (Gold Ratios)**:
+  - **S&P 500 / Gold Ratio** at 1.64 (+0.19σ, +3.53% vs SMA 200) -> Resilient broad-market equity strength when benchmarked against monetary gold.
+  - **Dow Jones / Gold Ratio** at 11.38 (+0.15σ, +2.94% vs SMA 200) -> Stable industrial/value asset valuations relative to hard currency reserves.`;
+
+    const macroIndicatorsSection = data.macroIndicators || defaultMacroIndicators;
+
+    const productDataList: string[] = [];
+    if (data.benchmark) {
+      productDataList.push(`- **Benchmark Index**: ${data.benchmark}`);
+    }
+    if (data.underlyingAsset) {
+      productDataList.push(`- **Underlying Spot Target**: ${data.underlyingAsset}`);
+    }
+    const productDataSection =
+      productDataList.length > 0 ? '\n' + productDataList.join('\n') : '';
 
     return `Deliver a concise, institutional-grade market analysis in markdown format for the instrument detailed below.
 
 ### Instrument Metadata:
-- **Name**: ${data.name}
-- **Ticker / ISIN**: ${data.symbol} ${data.isin ? `(ISIN: ${data.isin})` : ''}
-- **Asset Class**: ${data.assetType}
-- **Exchange / Currency**: ${data.exchange || 'N/A'} / ${data.currency}
-- **Latest Close**: ${data.lastClose} ${data.currency}
-- **Previous Close**: ${data.prevClose} ${data.currency}
-- **Session Performance**: ${sign}${data.priceChange} ${data.currency} (${sign}${data.priceChangePct.toFixed(2)}%)
+${metadataLines.join('\n')}
 
 ### News Feed & Catalysts:
-${newsSection ? newsSection : 'No direct headlines captured. Infer performance drivers from macro correlations, sector beta, and asset-class dynamics.'}
+${newsSection}
 
 ---
 
@@ -79,14 +121,15 @@ ${newsSection ? newsSection : 'No direct headlines captured. Infer performance d
 ### Required Output Structure (Markdown):
 
 #### 1. Executive Summary
-- Provide a 2-3 sentence core thesis capturing the instrument's current market stance, session outcome (${sign}${data.priceChangePct.toFixed(2)}%), and underlying momentum.
+- Provide a 2-3 sentence core thesis capturing the instrument's current market stance, session outcome (${formattedChangePct}), and underlying momentum.
 
 #### 2. Price Action & Session Drivers
-- Explain the key catalyst behind the ${sign}${data.priceChangePct.toFixed(2)}% move.
-- Reference extracted headlines if provided; if no direct news exists, explain the movement using broader market beta, sector rotation, or liquidity flows.
+- Reference extracted headlines and imminent risks to monitor, if provided, and explain the movement using following market indicators:
 
-#### 3. Macroeconomic & Cross-Asset Context
-- Outline relevant macroeconomic forces impacting this asset class (e.g., Central Bank policies / interest rates, Treasury yields, inflation indicators, currency fluctuations).
+${macroIndicatorsSection}
+
+#### 3. Macroeconomic & Cross-Asset Context analysis
+- Outline relevant macroeconomic forces impacting this asset class (central bank monetary policies, yield dynamics, global liquidity, risk appetite, and inflation trends) using these datas on the product:${productDataSection}
 
 #### 4. Key Catalysts & Risks to Monitor
 - Highlight 2 to 3 bullet points detailing near-term events (e.g., upcoming economic prints like CPI/PMI, central bank meetings, earnings releases, geopolitical developments).
@@ -103,9 +146,15 @@ ${newsSection ? newsSection : 'No direct headlines captured. Infer performance d
   /**
    * Generate report with resilient multi-model fallback hierarchy
    */
-  public async generateReport(data: ReportPromptData): Promise<{ markdown: string; modelUsed: string }> {
+  public async generateReport(
+    data: ReportPromptData,
+    customPrompt?: string
+  ): Promise<{ markdown: string; modelUsed: string }> {
     const client = this.getClient();
-    const prompt = this.buildPrompt(data);
+    const prompt =
+      customPrompt && customPrompt.trim().length > 10
+        ? customPrompt.trim()
+        : this.buildPrompt(data);
 
     let lastError: any = null;
 

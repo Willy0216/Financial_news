@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { TrackedAsset, ResolveResult, ResolutionData, ChartDataPoint, ReportResponse, Timeframe } from '../types/asset';
+import { MacroDashboardPayload } from '../types/macro';
 
 const api = axios.create({
   baseURL: '/api',
@@ -96,14 +97,24 @@ export const apiClient = {
   },
 
   /**
+   * GET /api/assets/:symbol/prompt - Fetch populated prompt template with live variables
+   */
+  async getPopulatedPrompt(symbol: string): Promise<string> {
+    const response = await api.get<{ success: boolean; prompt: string }>(
+      `/assets/${encodeURIComponent(symbol)}/prompt`
+    );
+    return response.data?.prompt || '';
+  },
+
+  /**
    * POST /api/assets/:symbol/report?refresh=false - Generate or fetch Gemini macro analysis
    */
-  async getReport(symbol: string, refresh = false): Promise<ReportResponse> {
+  async getReport(symbol: string, refresh = false, customPrompt?: string): Promise<ReportResponse> {
     const response = await api.post<ReportResponse>(
       `/assets/${encodeURIComponent(symbol)}/report`,
-      { refresh },
+      { refresh, customPrompt },
       {
-        params: { refresh: refresh ? 'true' : 'false' },
+        params: { refresh: refresh || Boolean(customPrompt) ? 'true' : 'false' },
         timeout: 60000,
       }
     );
@@ -116,6 +127,28 @@ export const apiClient = {
   async batchReports(refresh = false): Promise<any> {
     const response = await api.post('/reports/batch', { refresh }, { timeout: 180000 });
     return response.data;
+  },
+
+  /**
+   * GET /api/macro-dashboard - Fetch global macro intelligence dashboard
+   */
+  async getMacroDashboard(): Promise<MacroDashboardPayload> {
+    const response = await api.get<{
+      success: boolean;
+      data: MacroDashboardPayload;
+    }>('/macro-dashboard');
+    return response.data.data;
+  },
+
+  /**
+   * POST /api/macro-dashboard/refresh - Force refresh global macro intelligence dashboard
+   */
+  async refreshMacroDashboard(): Promise<MacroDashboardPayload> {
+    const response = await api.post<{
+      success: boolean;
+      data: MacroDashboardPayload;
+    }>('/macro-dashboard/refresh', {}, { timeout: 60000 });
+    return response.data.data;
   },
 
   /**

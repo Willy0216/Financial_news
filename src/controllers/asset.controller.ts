@@ -24,6 +24,18 @@ function getParamString(param: string | string[] | undefined): string {
   return param || '';
 }
 
+function normalizeUtcTimestamp(dateStr?: string | null): string {
+  if (!dateStr) return new Date().toISOString();
+  const s = String(dateStr).trim();
+  if (!s.includes('T') && s.includes(' ')) {
+    return s.replace(' ', 'T') + 'Z';
+  }
+  if (!s.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(s)) {
+    return s + 'Z';
+  }
+  return s;
+}
+
 export class AssetController {
   /**
    * GET /api/assets - List all tracked assets with current market quotes and latest report
@@ -32,7 +44,7 @@ export class AssetController {
     try {
       const assets = assetRepository.findAll();
 
-      // Enrich assets with live market quotes and latest report dates in parallel
+      // Enrich assets with live market quotes, profiles, and latest report dates in parallel
       const enrichedAssets = await Promise.all(
         assets.map(async (asset) => {
           const quote = await marketDataService.getQuote(asset.symbol);
@@ -42,6 +54,22 @@ export class AssetController {
           // Sync database if currency differed or was saved with default
           if (quote?.currency && asset.currency !== quote.currency) {
             assetRepository.updateCurrency(asset.symbol, quote.currency);
+          }
+
+          // Parse or on-demand fetch underlying profile data
+          let profile = null;
+          if (asset.underlying_data) {
+            try {
+              profile = JSON.parse(asset.underlying_data);
+            } catch {
+              profile = null;
+            }
+          }
+          if (!profile) {
+            profile = await marketDataService.fetchUnderlyingData(asset.symbol, asset.asset_type);
+            if (profile) {
+              assetRepository.updateUnderlyingData(asset.symbol, JSON.stringify(profile));
+            }
           }
 
           return {
@@ -56,14 +84,16 @@ export class AssetController {
             lastClose: quote?.price ?? 0,
             prevClose: quote?.prevClose ?? 0,
             priceChangePct: quote?.priceChangePct ?? 0,
-            created_at: asset.created_at,
+            created_at: normalizeUtcTimestamp(asset.created_at),
+            underlying_data: asset.underlying_data || (profile ? JSON.stringify(profile) : null),
+            profile,
             quote: quote || null,
             latest_report: latestReport
               ? {
                   id: latestReport.id,
                   price_change_pct: latestReport.price_change_pct,
                   last_close: latestReport.last_close,
-                  created_at: latestReport.created_at,
+                  created_at: normalizeUtcTimestamp(latestReport.created_at),
                 }
               : null,
           };
@@ -170,6 +200,10 @@ export class AssetController {
         return;
       }
 
+      // Fetch underlying instrument profile metadata
+      const profile = await marketDataService.fetchUnderlyingData(symbolToUse, assetTypeToUse);
+      const underlyingDataStr = profile ? JSON.stringify(profile) : null;
+
       // Persist new tracked asset
       const newAsset = assetRepository.create({
         symbol: symbolToUse,
@@ -178,6 +212,7 @@ export class AssetController {
         asset_type: assetTypeToUse,
         exchange: exchangeToUse,
         currency: currencyToUse,
+        underlying_data: underlyingDataStr,
       });
 
       res.status(201).json({
@@ -195,7 +230,9 @@ export class AssetController {
           lastClose: validation.quote.price,
           prevClose: validation.quote.prevClose,
           priceChangePct: validation.quote.priceChangePct,
-          created_at: newAsset.created_at,
+          created_at: normalizeUtcTimestamp(newAsset.created_at),
+          underlying_data: underlyingDataStr,
+          profile,
           quote: validation.quote,
         },
       });
@@ -226,6 +263,22 @@ export class AssetController {
         assetRepository.updateCurrency(asset.symbol, quote.currency);
       }
 
+      // Parse or on-demand fetch underlying profile data
+      let profile = null;
+      if (asset.underlying_data) {
+        try {
+          profile = JSON.parse(asset.underlying_data);
+        } catch {
+          profile = null;
+        }
+      }
+      if (!profile) {
+        profile = await marketDataService.fetchUnderlyingData(asset.symbol, asset.asset_type);
+        if (profile) {
+          assetRepository.updateUnderlyingData(asset.symbol, JSON.stringify(profile));
+        }
+      }
+
       res.status(200).json({
         success: true,
         data: {
@@ -240,9 +293,16 @@ export class AssetController {
           lastClose: quote?.price ?? 0,
           prevClose: quote?.prevClose ?? 0,
           priceChangePct: quote?.priceChangePct ?? 0,
-          created_at: asset.created_at,
+          created_at: normalizeUtcTimestamp(asset.created_at),
+          underlying_data: asset.underlying_data || (profile ? JSON.stringify(profile) : null),
+          profile,
           quote: quote || null,
-          latest_report: latestReport || null,
+          latest_report: latestReport
+            ? {
+                ...latestReport,
+                created_at: normalizeUtcTimestamp(latestReport.created_at),
+              }
+            : null,
         },
       });
     } catch (error: any) {

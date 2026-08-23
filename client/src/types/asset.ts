@@ -1,5 +1,23 @@
 export type AssetType = 'ETF' | 'EQUITY' | 'INDEX' | 'COMMODITY';
 
+export interface HoldingItem {
+  symbol?: string;
+  name: string;
+  weightPct: number;
+}
+
+export interface UnderlyingProfileData {
+  categoryName?: string;
+  family?: string;
+  benchmark?: string;
+  sector?: string;
+  industry?: string;
+  summary?: string;
+  topHoldings?: HoldingItem[];
+  sectorWeights?: Record<string, number>;
+  underlyingAsset?: string;
+}
+
 export interface TrackedAsset {
   id: number;
   symbol: string;
@@ -12,6 +30,8 @@ export interface TrackedAsset {
   prevClose: number;
   priceChangePct: number;
   created_at?: string;
+  underlying_data?: string | null;
+  profile?: UnderlyingProfileData | null;
   quote?: {
     price: number;
     prevClose: number;

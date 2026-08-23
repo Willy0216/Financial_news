@@ -2,8 +2,9 @@ import React from 'react';
 import { X, Copy, Check, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { TrackedAsset } from '../types/asset';
 import { PriceChart } from './PriceChart';
+import { AssetProfileCard } from './AssetProfileCard';
 import { AIReportPanel } from './AIReportPanel';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, getAssetTypeBadgeColor } from '../utils/formatters';
 
 interface AssetDetailModalProps {
   asset: TrackedAsset | null;
@@ -46,7 +47,11 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               <span className="font-mono text-2xl font-extrabold text-white tracking-tight">
                 {asset.symbol}
               </span>
-              <span className="text-[11px] uppercase font-bold px-2 py-0.5 rounded-md bg-indigo-950 text-indigo-400 border border-indigo-800/80">
+              <span
+                className={`text-[11px] uppercase font-bold px-2 py-0.5 rounded-md border ${getAssetTypeBadgeColor(
+                  asset.assetType || 'EQUITY'
+                )}`}
+              >
                 {asset.assetType || 'EQUITY'}
               </span>
               {asset.exchange && (
@@ -115,6 +120,14 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
           <PriceChart
             symbol={asset.symbol}
             currency={asset.currency}
+          />
+
+          {/* Product Profile & Underlying Assets Breakdown */}
+          <AssetProfileCard
+            profile={asset.profile}
+            assetType={asset.assetType || 'EQUITY'}
+            symbol={asset.symbol}
+            name={asset.name}
           />
 
           {/* Gemini Macro Intelligence Markdown Panel */}

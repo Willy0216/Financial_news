@@ -8,6 +8,18 @@ function getParamString(param: string | string[] | undefined): string {
   return param || '';
 }
 
+function normalizeUtcTimestamp(dateStr?: string | null): string {
+  if (!dateStr) return new Date().toISOString();
+  const s = String(dateStr).trim();
+  if (!s.includes('T') && s.includes(' ')) {
+    return s.replace(' ', 'T') + 'Z';
+  }
+  if (!s.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(s)) {
+    return s + 'Z';
+  }
+  return s;
+}
+
 export class ReportController {
   /**
    * POST /api/assets/:symbol/report - Generate or retrieve report for an asset
@@ -16,19 +28,30 @@ export class ReportController {
   public async generateReport(req: Request, res: Response): Promise<void> {
     try {
       const symbol = getParamString(req.params.symbol);
+      const customPrompt =
+        typeof req.body?.customPrompt === 'string'
+          ? req.body.customPrompt
+          : typeof req.body?.prompt === 'string'
+          ? req.body.prompt
+          : undefined;
+
       const force =
+        Boolean(customPrompt) ||
         req.body?.refresh === true ||
         req.body?.force === true ||
         req.query?.refresh === 'true' ||
         req.query?.force === 'true';
 
-      const result = await reportGeneratorService.generateReportForSymbol(symbol, { force });
+      const result = await reportGeneratorService.generateReportForSymbol(symbol, {
+        force,
+        customPrompt,
+      });
 
       const isHoliday =
         result.status === 'skipped_market_closed' || result.status === 'skipped_zero_change';
 
       if (result.status === 'error') {
-        res.status(500).json({
+        res.status(422).json({
           success: false,
           error: result.reason || 'Failed to generate report',
           symbol: symbol.toUpperCase(),
@@ -46,12 +69,30 @@ export class ReportController {
         reportMarkdown: result.reportMarkdown || result.report?.report_markdown || '',
         modelUsed: result.modelUsed || result.report?.model_used || null,
         model_used: result.modelUsed || result.report?.model_used || null,
-        createdAt: result.report?.created_at || new Date().toISOString(),
+        createdAt: normalizeUtcTimestamp(result.report?.created_at),
         isHoliday,
         data: result,
       });
     } catch (error: any) {
       logger.error(`Error in generateReport for ${req.params.symbol}:`, error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/assets/:symbol/prompt - Get variable-populated prompt template for an asset
+   */
+  public async getPopulatedPrompt(req: Request, res: Response): Promise<void> {
+    try {
+      const symbol = getParamString(req.params.symbol);
+      const prompt = await reportGeneratorService.getPopulatedPromptForSymbol(symbol);
+      res.status(200).json({
+        success: true,
+        symbol: symbol.toUpperCase(),
+        prompt,
+      });
+    } catch (error: any) {
+      logger.error(`Error fetching prompt for ${req.params.symbol}:`, error);
       res.status(500).json({ success: false, error: error.message });
     }
   }
@@ -70,7 +111,10 @@ export class ReportController {
         success: true,
         symbol: symbol.toUpperCase(),
         count: reports.length,
-        data: reports,
+        data: reports.map((r) => ({
+          ...r,
+          created_at: normalizeUtcTimestamp(r.created_at),
+        })),
       });
     } catch (error: any) {
       logger.error(`Error fetching reports for ${req.params.symbol}:`, error);

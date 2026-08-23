@@ -6,7 +6,11 @@ dotenv.config();
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  databasePath: process.env.DATABASE_PATH || path.resolve(process.cwd(), 'data', 'finance.db'),
+  databasePath:
+    process.env.DATABASE_PATH ||
+    (process.env.NODE_ENV === 'test'
+      ? path.resolve(process.cwd(), 'data', 'test.db')
+      : path.resolve(process.cwd(), 'data', 'finance.db')),
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   openFigiApiKey: process.env.OPENFIGI_API_KEY || '',
   models: {

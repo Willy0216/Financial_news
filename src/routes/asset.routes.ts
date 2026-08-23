@@ -11,6 +11,7 @@ router.get('/:symbol', (req, res) => assetController.getAsset(req, res));
 router.delete('/:symbol', (req, res) => assetController.deleteAsset(req, res));
 
 // Asset-specific report routes
+router.get('/:symbol/prompt', (req, res) => reportController.getPopulatedPrompt(req, res));
 router.post('/:symbol/report', (req, res) => reportController.generateReport(req, res));
 router.get('/:symbol/reports', (req, res) => reportController.getAssetReports(req, res));
 

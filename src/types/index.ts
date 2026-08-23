@@ -1,5 +1,23 @@
 export type AssetType = 'ETF' | 'EQUITY' | 'INDEX' | 'COMMODITY';
 
+export interface HoldingItem {
+  symbol?: string;
+  name: string;
+  weightPct: number;
+}
+
+export interface UnderlyingProfileData {
+  categoryName?: string;
+  family?: string;
+  benchmark?: string;
+  sector?: string;
+  industry?: string;
+  summary?: string;
+  topHoldings?: HoldingItem[];
+  sectorWeights?: Record<string, number>;
+  underlyingAsset?: string;
+}
+
 export interface TrackedAsset {
   id: number;
   symbol: string;
@@ -8,6 +26,8 @@ export interface TrackedAsset {
   asset_type: AssetType;
   exchange: string | null;
   currency: string;
+  underlying_data?: string | null;
+  profile?: UnderlyingProfileData | null;
   created_at: string;
 }
 
@@ -18,6 +38,7 @@ export interface TrackedAssetInput {
   asset_type: AssetType;
   exchange?: string | null;
   currency?: string;
+  underlying_data?: string | null;
 }
 
 export interface AssetReport {
@@ -89,3 +110,6 @@ export interface ReportGenerationResult {
   reportMarkdown?: string;
   modelUsed?: string;
 }
+
+export * from './macro.js';
+

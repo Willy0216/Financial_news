@@ -25,8 +25,8 @@ export class AssetRepository {
   public create(asset: TrackedAssetInput): TrackedAsset {
     const db = getDb();
     const stmt = db.prepare(`
-      INSERT INTO tracked_assets (symbol, isin, name, asset_type, exchange, currency)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO tracked_assets (symbol, isin, name, asset_type, exchange, currency, underlying_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -35,7 +35,8 @@ export class AssetRepository {
       asset.name,
       asset.asset_type,
       asset.exchange || null,
-      asset.currency || 'EUR'
+      asset.currency || 'EUR',
+      asset.underlying_data || null
     );
 
     const insertedId = Number(result.lastInsertRowid);
@@ -44,6 +45,14 @@ export class AssetRepository {
       throw new Error(`Failed to retrieve newly created asset with ID ${insertedId}`);
     }
     return created;
+  }
+
+  public updateUnderlyingData(symbol: string, underlyingData: string): boolean {
+    const db = getDb();
+    const result = db
+      .prepare('UPDATE tracked_assets SET underlying_data = ? WHERE UPPER(symbol) = UPPER(?)')
+      .run(underlyingData, symbol);
+    return Number(result.changes) > 0;
   }
 
   public delete(identifier: string | number): boolean {
