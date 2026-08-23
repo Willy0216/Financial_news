@@ -44,6 +44,8 @@ export class ReportController {
         success: true,
         symbol: symbol.toUpperCase(),
         reportMarkdown: result.reportMarkdown || result.report?.report_markdown || '',
+        modelUsed: result.modelUsed || result.report?.model_used || null,
+        model_used: result.modelUsed || result.report?.model_used || null,
         createdAt: result.report?.created_at || new Date().toISOString(),
         isHoliday,
         data: result,

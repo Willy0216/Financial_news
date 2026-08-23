@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { TrackedAsset, ResolveResult, ChartDataPoint, ReportResponse, Timeframe } from '../types/asset';
+import { TrackedAsset, ResolveResult, ResolutionData, ChartDataPoint, ReportResponse, Timeframe } from '../types/asset';
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 20000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -37,9 +37,9 @@ export const apiClient = {
   },
 
   /**
-   * POST /api/resolve - Auto-resolve Ticker or ISIN candidates
+   * POST /api/resolve - Auto-resolve Ticker or ISIN candidates with multi-result list
    */
-  async resolveQuery(query: string): Promise<ResolveResult | null> {
+  async resolveQuery(query: string): Promise<ResolutionData | null> {
     if (!query.trim()) return null;
     const response = await api.post<{
       success: boolean;
@@ -52,29 +52,34 @@ export const apiClient = {
       isin?: string;
       isValid?: boolean;
       candidates?: ResolveResult[];
+      error?: string;
     }>('/resolve', { query });
 
-    if (response.data.bestMatch) {
-      return response.data.bestMatch;
-    }
+    const candidates: ResolveResult[] = response.data.candidates || [];
+    let bestMatch: ResolveResult | null = response.data.bestMatch || null;
 
-    if (response.data.symbol && response.data.isValid) {
-      return {
+    if (!bestMatch && response.data.symbol && response.data.isValid) {
+      bestMatch = {
         symbol: response.data.symbol,
         name: response.data.name || response.data.symbol,
         exchange: response.data.exchange || '',
         assetType: response.data.assetType || 'EQUITY',
-        currency: response.data.currency || 'EUR',
+        currency: response.data.currency || 'USD',
         isin: response.data.isin,
         isValid: true,
       };
     }
 
-    if (response.data.candidates && response.data.candidates.length > 0) {
-      return response.data.candidates[0];
+    if (!bestMatch && candidates.length > 0) {
+      bestMatch = candidates[0];
     }
 
-    return null;
+    return {
+      success: response.data.success || candidates.length > 0,
+      bestMatch,
+      candidates,
+      error: response.data.error,
+    };
   },
 
   /**
@@ -97,7 +102,10 @@ export const apiClient = {
     const response = await api.post<ReportResponse>(
       `/assets/${encodeURIComponent(symbol)}/report`,
       { refresh },
-      { params: { refresh: refresh ? 'true' : 'false' } }
+      {
+        params: { refresh: refresh ? 'true' : 'false' },
+        timeout: 60000,
+      }
     );
     return response.data;
   },
@@ -106,7 +114,7 @@ export const apiClient = {
    * POST /api/reports/batch - Batch update reports
    */
   async batchReports(refresh = false): Promise<any> {
-    const response = await api.post('/reports/batch', { refresh });
+    const response = await api.post('/reports/batch', { refresh }, { timeout: 180000 });
     return response.data;
   },
 

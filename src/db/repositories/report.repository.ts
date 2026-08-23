@@ -5,8 +5,8 @@ export class ReportRepository {
   public create(report: AssetReportInput): AssetReport {
     const db = getDb();
     const stmt = db.prepare(`
-      INSERT INTO asset_reports (symbol, price_change_pct, prev_close, last_close, report_markdown)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO asset_reports (symbol, price_change_pct, prev_close, last_close, report_markdown, model_used)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -14,7 +14,8 @@ export class ReportRepository {
       report.price_change_pct,
       report.prev_close,
       report.last_close,
-      report.report_markdown
+      report.report_markdown,
+      report.model_used || null
     );
 
     const insertedId = Number(result.lastInsertRowid);

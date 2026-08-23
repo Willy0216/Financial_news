@@ -41,6 +41,13 @@ export interface ResolveResult {
   lastPrice?: number;
 }
 
+export interface ResolutionData {
+  success: boolean;
+  bestMatch?: ResolveResult | null;
+  candidates: ResolveResult[];
+  error?: string;
+}
+
 export interface ChartDataPoint {
   timestamp: string;
   close: number;
@@ -53,6 +60,7 @@ export interface ReportResponse {
   isHoliday?: boolean;
   status?: 'generated' | 'cached' | 'skipped_market_closed' | 'skipped_zero_change' | 'error';
   modelUsed?: string;
+  model_used?: string;
 }
 
 export type Timeframe = '1W' | '1M' | '6M' | '1Y' | 'YTD';

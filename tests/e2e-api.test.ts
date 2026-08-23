@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 import http from 'http';
 import axios from 'axios';
 import app from '../src/index.js';
@@ -5,8 +6,7 @@ import { getDb } from '../src/db/db.js';
 import { reportRepository } from '../src/db/repositories/report.repository.js';
 
 let server: http.Server;
-const PORT = 3099;
-const API_BASE = `http://127.0.0.1:${PORT}/api`;
+let API_BASE = '';
 
 let passed = 0;
 let failed = 0;
@@ -26,9 +26,15 @@ async function runE2ETests() {
   console.log('🌐 RUNNING END-TO-END REST API TESTS');
   console.log('=============================================\n');
 
-  // Start temporary test server
+  // Clean DB first
+  const db = getDb();
+  db.exec('DELETE FROM asset_reports; DELETE FROM tracked_assets;');
+
+  // Start temporary test server on dynamic port
   await new Promise<void>((resolve) => {
-    server = app.listen(PORT, '127.0.0.1', () => {
+    server = app.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as any;
+      API_BASE = `http://127.0.0.1:${addr.port}/api`;
       resolve();
     });
   });
@@ -52,8 +58,6 @@ async function runE2ETests() {
 
     // 3. Add Asset via ISIN (POST /api/assets)
     console.log('\n--- 3. Asset Tracking Endpoints ---');
-    // Clean DB first
-    const db = getDb();
     db.exec('DELETE FROM asset_reports; DELETE FROM tracked_assets;');
 
     const addIsinRes = await axios.post(`${API_BASE}/assets`, {
@@ -65,10 +69,11 @@ async function runE2ETests() {
 
     // 4. Add Asset via Ticker (POST /api/assets)
     const addTickerRes = await axios.post(`${API_BASE}/assets`, {
-      symbol: 'VWCE.DE',
+      identifier: 'MEUD.MI',
     });
     assert(addTickerRes.status === 201, 'POST /api/assets with Ticker returns 201 Created');
-    assert(addTickerRes.data.data.asset_type === 'ETF', 'VWCE.DE correctly classified as ETF');
+    assert(addTickerRes.data.data.symbol === 'MEUD.MI', 'MEUD.MI added to tracked assets');
+    assert(addTickerRes.data.data.isin === 'LU0908500753', `Reverse ISIN for MEUD.MI saved as LU0908500753 (got: ${addTickerRes.data.data.isin})`);
 
     // 5. Test Duplicate Prevention (409 Conflict)
     try {

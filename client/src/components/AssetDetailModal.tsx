@@ -3,6 +3,7 @@ import { X, Copy, Check, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { TrackedAsset } from '../types/asset';
 import { PriceChart } from './PriceChart';
 import { AIReportPanel } from './AIReportPanel';
+import { formatCurrency } from '../utils/formatters';
 
 interface AssetDetailModalProps {
   asset: TrackedAsset | null;
@@ -32,16 +33,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   const isNegative = changePct < 0;
 
   const formatPrice = (price: number, currency: string) => {
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency || 'EUR',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 4,
-      }).format(price);
-    } catch {
-      return `${currency} ${price?.toFixed(2) ?? '0.00'}`;
-    }
+    return formatCurrency(price, currency, 2);
   };
 
   return (

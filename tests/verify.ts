@@ -132,6 +132,27 @@ async function runTests() {
         goldIsinResolution.bestMatch?.name.toLowerCase().includes('gold'),
       `IE00B4ND3602 resolves to descriptive name: "${goldIsinResolution.bestMatch?.name}"`
     );
+
+    console.log('  Resolving European ETF ISIN "LU0908500753" (Amundi Stoxx 600)...');
+    const amundiResolution = await isinResolverService.resolve('LU0908500753');
+    assert(
+      amundiResolution.resolved && amundiResolution.candidates.length > 0,
+      `LU0908500753 resolves with ${amundiResolution.candidates.length} candidates (Best match: ${amundiResolution.bestMatch?.symbol})`
+    );
+
+    console.log('  Resolving Italian ISIN "IT0005239360" (UniCredit)...');
+    const ucgResolution = await isinResolverService.resolve('IT0005239360');
+    assert(
+      ucgResolution.resolved && ucgResolution.bestMatch?.symbol === 'UCG.MI',
+      `IT0005239360 resolves to Italian exchange ticker: "${ucgResolution.bestMatch?.symbol}"`
+    );
+
+    console.log('  Testing reverse ISIN lookup on direct tickers...');
+    const meudIsin = await isinResolverService.findIsinForSymbol('MEUD.MI');
+    assert(meudIsin === 'LU0908500753', `Reverse ISIN for MEUD.MI is LU0908500753 (got: ${meudIsin})`);
+
+    const aaplIsin = await isinResolverService.findIsinForSymbol('AAPL');
+    assert(aaplIsin === 'US0378331005', `Reverse ISIN for AAPL is US0378331005 (got: ${aaplIsin})`);
   } catch (err: any) {
     assert(false, 'ISIN resolution test exception', err);
   }

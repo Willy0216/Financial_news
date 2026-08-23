@@ -37,6 +37,12 @@ export class AssetController {
         assets.map(async (asset) => {
           const quote = await marketDataService.getQuote(asset.symbol);
           const latestReport = reportRepository.findLatestBySymbol(asset.symbol);
+          const liveCurrency = quote?.currency || asset.currency || 'USD';
+
+          // Sync database if currency differed or was saved with default
+          if (quote?.currency && asset.currency !== quote.currency) {
+            assetRepository.updateCurrency(asset.symbol, quote.currency);
+          }
 
           return {
             id: asset.id,
@@ -46,7 +52,7 @@ export class AssetController {
             assetType: asset.asset_type,
             asset_type: asset.asset_type,
             exchange: asset.exchange || quote?.exchange || '',
-            currency: asset.currency || quote?.currency || 'EUR',
+            currency: liveCurrency,
             lastClose: quote?.price ?? 0,
             prevClose: quote?.prevClose ?? 0,
             priceChangePct: quote?.priceChangePct ?? 0,
@@ -106,7 +112,7 @@ export class AssetController {
       let nameToUse = body.name;
       let assetTypeToUse: AssetType | undefined = body.assetType || body.asset_type;
       let exchangeToUse = body.exchange;
-      let currencyToUse = body.currency || 'EUR';
+      let currencyToUse = body.currency;
 
       // If resolving via query / isin or if details are missing:
       if (!symbolToUse || !nameToUse || !assetTypeToUse) {
@@ -125,11 +131,18 @@ export class AssetController {
         symbolToUse = symbolToUse || match.symbol;
         if (isinResolverService.isIsin(inputQuery)) {
           isinToUse = inputQuery;
+        } else if (match.isin) {
+          isinToUse = match.isin;
         }
         nameToUse = nameToUse || match.name;
         assetTypeToUse = assetTypeToUse || match.assetType;
         exchangeToUse = exchangeToUse || match.exchange;
         currencyToUse = currencyToUse || match.currency;
+      }
+
+      // If ISIN is still not set, perform reverse ISIN lookup
+      if (!isinToUse && symbolToUse) {
+        isinToUse = await isinResolverService.findIsinForSymbol(symbolToUse);
       }
 
       // Final active trading validation
@@ -141,6 +154,10 @@ export class AssetController {
         });
         return;
       }
+
+      // Inherit verified market quote currency & exchange
+      currencyToUse = validation.quote.currency || currencyToUse || 'USD';
+      exchangeToUse = validation.quote.exchange || exchangeToUse;
 
       // Check if already tracked
       const existing = assetRepository.findBySymbol(symbolToUse);
@@ -203,6 +220,11 @@ export class AssetController {
 
       const quote = await marketDataService.getQuote(asset.symbol);
       const latestReport = reportRepository.findLatestBySymbol(asset.symbol);
+      const liveCurrency = quote?.currency || asset.currency || 'USD';
+
+      if (quote?.currency && asset.currency !== quote.currency) {
+        assetRepository.updateCurrency(asset.symbol, quote.currency);
+      }
 
       res.status(200).json({
         success: true,
@@ -214,7 +236,7 @@ export class AssetController {
           assetType: asset.asset_type,
           asset_type: asset.asset_type,
           exchange: asset.exchange || quote?.exchange || '',
-          currency: asset.currency || quote?.currency || 'EUR',
+          currency: liveCurrency,
           lastClose: quote?.price ?? 0,
           prevClose: quote?.prevClose ?? 0,
           priceChangePct: quote?.priceChangePct ?? 0,

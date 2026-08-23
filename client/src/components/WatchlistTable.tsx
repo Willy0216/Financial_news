@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { TrackedAsset, Timeframe } from '../types/asset';
 import { apiClient } from '../api/client';
+import { formatCurrency } from '../utils/formatters';
 
 export type TimeArc = '1D' | '1W' | '1M' | '6M' | '1Y' | 'YTD';
 
@@ -123,16 +124,7 @@ export const WatchlistTable: React.FC<WatchlistTableProps> = ({
   };
 
   const formatPrice = (price: number, currency: string) => {
-    try {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency || 'EUR',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 4,
-      }).format(price);
-    } catch {
-      return `${currency} ${price?.toFixed(2) ?? '0.00'}`;
-    }
+    return formatCurrency(price, currency, 2);
   };
 
   const getAssetTypeBadgeColor = (type: string) => {

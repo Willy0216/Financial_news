@@ -50,6 +50,7 @@ export class ReportGeneratorService {
           status: 'cached',
           report: cached,
           reportMarkdown: cached.report_markdown,
+          modelUsed: cached.model_used || undefined,
           reason: 'Valid report generated earlier today found in cache.',
         };
       }
@@ -82,6 +83,7 @@ export class ReportGeneratorService {
         prev_close: quote.prevClose,
         last_close: quote.price,
         report_markdown: markdown,
+        model_used: modelUsed,
       });
 
       return {

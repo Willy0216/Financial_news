@@ -10,8 +10,8 @@ export const config = {
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   openFigiApiKey: process.env.OPENFIGI_API_KEY || '',
   models: {
-    primary: process.env.GEMINI_PRIMARY_MODEL || 'gemini-2.5-flash',
-    fallbacks: (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-pro,gemini-2.0-flash,gemini-1.5-flash')
+    primary: process.env.GEMINI_PRIMARY_MODEL || 'gemini-3.6-flash',
+    fallbacks: (process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash,gemini-3.7-flash')
       .split(',')
       .map((m) => m.trim())
       .filter(Boolean),

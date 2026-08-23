@@ -57,6 +57,15 @@ export class AssetRepository {
     }
   }
 
+  public updateCurrency(symbol: string, currency: string): boolean {
+    const db = getDb();
+    const result = db.prepare('UPDATE tracked_assets SET currency = ? WHERE UPPER(symbol) = UPPER(?)').run(
+      currency.toUpperCase(),
+      symbol
+    );
+    return Number(result.changes) > 0;
+  }
+
   public count(): number {
     const db = getDb();
     const row = db.prepare<{ total: number }>('SELECT COUNT(*) as total FROM tracked_assets').get();

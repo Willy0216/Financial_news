@@ -27,6 +27,7 @@ export interface AssetReport {
   prev_close: number;
   last_close: number;
   report_markdown: string;
+  model_used?: string | null;
   created_at: string;
 }
 
@@ -36,6 +37,7 @@ export interface AssetReportInput {
   prev_close: number;
   last_close: number;
   report_markdown: string;
+  model_used?: string | null;
 }
 
 export interface MarketQuote {
@@ -57,6 +59,7 @@ export interface MarketQuote {
 
 export interface ISINCandidate {
   symbol: string;
+  isin?: string;
   name: string;
   exchange: string;
   currency: string;
@@ -71,6 +74,7 @@ export interface ISINCandidate {
 
 export interface ResolutionResponse {
   query: string;
+  isin?: string;
   resolved: boolean;
   bestMatch?: ISINCandidate;
   candidates: ISINCandidate[];

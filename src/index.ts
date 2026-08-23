@@ -1,5 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { config } from './config/env.js';
 import { getDb } from './db/db.js';
 import apiRouter from './routes/index.js';
@@ -18,35 +20,50 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-// Root welcome & API info
-app.get('/', (_req: Request, res: Response) => {
-  res.json({
-    service: 'Financial News & Asset Tracking Backend',
-    version: '1.0.0',
-    endpoints: {
-      health: 'GET /api/health',
-      assets: {
-        list: 'GET /api/assets',
-        add: 'POST /api/assets',
-        get: 'GET /api/assets/:symbol',
-        delete: 'DELETE /api/assets/:symbol',
-        report: 'POST /api/assets/:symbol/report',
-        reports: 'GET /api/assets/:symbol/reports',
-      },
-      reports: {
-        batch: 'POST /api/reports/batch',
-      },
-      resolve: {
-        preview: 'POST /api/resolve',
-      },
-    },
-  });
-});
-
 // Mount lean REST layer strictly under /api
 app.use('/api', apiRouter);
 
-// 404 Not Found Handler
+// Serve static frontend from client/dist if built
+const clientDistPath = path.resolve(process.cwd(), 'client', 'dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} else {
+  // Fallback root welcome & API info if client is not built
+  app.get('/', (_req: Request, res: Response) => {
+    res.json({
+      service: 'Financial News & Asset Tracking Backend',
+      version: '1.0.0',
+      endpoints: {
+        health: 'GET /api/health',
+        assets: {
+          list: 'GET /api/assets',
+          add: 'POST /api/assets',
+          get: 'GET /api/assets/:symbol',
+          delete: 'DELETE /api/assets/:symbol',
+          report: 'POST /api/assets/:symbol/report',
+          reports: 'GET /api/assets/:symbol/reports',
+        },
+        reports: {
+          batch: 'POST /api/reports/batch',
+        },
+        resolve: {
+          preview: 'POST /api/resolve',
+        },
+        chart: {
+          history: 'GET /api/chart/:symbol?range=1M',
+        },
+      },
+    });
+  });
+}
+
+// 404 Not Found Handler (for unmatched API routes)
 app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
@@ -72,6 +89,9 @@ function startServer() {
     const server = app.listen(config.port, () => {
       logger.info(`🚀 Server running on http://localhost:${config.port}`);
       logger.info(`📡 API available at http://localhost:${config.port}/api`);
+      if (fs.existsSync(clientDistPath)) {
+        logger.info(`💻 Frontend served at http://localhost:${config.port}`);
+      }
     });
 
     // Graceful shutdown handling
@@ -97,8 +117,15 @@ function startServer() {
   }
 }
 
-// Start if executed directly
-if (process.env.NODE_ENV !== 'test') {
+// Only auto-start server when executed directly as entrypoint, not when imported in tests
+const isDirectExecution = () => {
+  if (process.env.NODE_ENV === 'test') return false;
+  if (!process.argv[1]) return false;
+  const entry = process.argv[1].replace(/\\/g, '/');
+  return entry.endsWith('src/index.ts') || entry.endsWith('dist/index.js') || entry.endsWith('src/index.js');
+};
+
+if (isDirectExecution()) {
   startServer();
 }
 

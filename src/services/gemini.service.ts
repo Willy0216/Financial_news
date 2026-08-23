@@ -52,31 +52,52 @@ export class GeminiService {
 
     const sign = data.priceChangePct >= 0 ? '+' : '';
 
-    return `You are a Senior Financial Market & Macroeconomic Analyst.
-Write a concise, high-impact, professional financial analysis report in English for the following asset:
+    return `Deliver a concise, institutional-grade market analysis in markdown format for the instrument detailed below.
 
-### Asset Information:
+### Instrument Metadata:
 - **Name**: ${data.name}
-- **Symbol**: ${data.symbol}
-- **ISIN**: ${data.isin || 'N/A'}
-- **Asset Type**: ${data.assetType}
-- **Exchange**: ${data.exchange || 'N/A'}
-- **Currency**: ${data.currency}
-- **Latest Close Price**: ${data.lastClose} ${data.currency}
+- **Ticker / ISIN**: ${data.symbol} ${data.isin ? `(ISIN: ${data.isin})` : ''}
+- **Asset Class**: ${data.assetType}
+- **Exchange / Currency**: ${data.exchange || 'N/A'} / ${data.currency}
+- **Latest Close**: ${data.lastClose} ${data.currency}
 - **Previous Close**: ${data.prevClose} ${data.currency}
-- **Price Change**: ${sign}${data.priceChange} ${data.currency} (${sign}${data.priceChangePct.toFixed(2)}%)
-${newsSection}
+- **Session Performance**: ${sign}${data.priceChange} ${data.currency} (${sign}${data.priceChangePct.toFixed(2)}%)
 
-### Report Guidelines:
-1. Provide a well-structured markdown report.
-2. Focus on macroeconomic indicators (interest rates, central banks, inflation, economic data), sector specific trends, and market sentiment driving this asset.
-3. Structure the output with these exact sections:
-   - **Executive Summary**: High-level takeaway of the asset's performance and core thesis.
-   - **Price Action & Intraday Drivers**: Why the asset moved ${sign}${data.priceChangePct.toFixed(2)}% in the session.
-   - **Macroeconomic & Sector Context**: Broader market drivers, bond yields, currency fluctuations, or commodity dynamics relevant to this asset.
-   - **Risks & Key Catalysts Ahead**: Near-term upcoming events (earnings, CPI, FOMC/ECB meetings, geopolitical factors).
-4. Do NOT give direct financial or trading advice (e.g. "buy", "sell", "target price"). Keep the tone analytical, institutional, and objective.
-5. All text MUST be strictly in English.`;
+### News Feed & Catalysts:
+${newsSection ? newsSection : 'No direct headlines captured. Infer performance drivers from macro correlations, sector beta, and asset-class dynamics.'}
+
+---
+
+### Analytical Framework & Asset-Specific Heuristics:
+- **ETFs / Funds**: Anchor analysis on underlying basket exposure, sector weighting, and broad index beta.
+- **Equities**: Focus on earnings expectations, company guidance, cost of capital, and peer valuation trends.
+- **Commodities & Metals (Gold, Oil, etc.)**: Analyze real yields, US Dollar Index (DXY) momentum, geopolitical risk premiums, and supply-demand fundamentals.
+- **Crypto & Futures**: Assess macro risk sentiment (risk-on / risk-off), global liquidity conditions, and regulatory or flow trends.
+
+---
+
+### Required Output Structure (Markdown):
+
+#### 1. Executive Summary
+- Provide a 2-3 sentence core thesis capturing the instrument's current market stance, session outcome (${sign}${data.priceChangePct.toFixed(2)}%), and underlying momentum.
+
+#### 2. Price Action & Session Drivers
+- Explain the key catalyst behind the ${sign}${data.priceChangePct.toFixed(2)}% move.
+- Reference extracted headlines if provided; if no direct news exists, explain the movement using broader market beta, sector rotation, or liquidity flows.
+
+#### 3. Macroeconomic & Cross-Asset Context
+- Outline relevant macroeconomic forces impacting this asset class (e.g., Central Bank policies / interest rates, Treasury yields, inflation indicators, currency fluctuations).
+
+#### 4. Key Catalysts & Risks to Monitor
+- Highlight 2 to 3 bullet points detailing near-term events (e.g., upcoming economic prints like CPI/PMI, central bank meetings, earnings releases, geopolitical developments).
+
+---
+
+### Formatting & Compliance Guardrails:
+- **Tone**: Professional, data-driven, concise, and institutional.
+- **No Boilerplate Fluff**: Skip conversational openers ("Here is the report...") or generic disclaimers. Jump straight into the markdown sections.
+- **Regulatory Guardrail**: Provide objective analytical commentary only. Strictly avoid investment recommendations (e.g., never write "buy", "sell", "hold", or set price targets).
+- **Language**: Strictly English.`;
   }
 
   /**

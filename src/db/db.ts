@@ -107,6 +107,7 @@ export function initSchema(db: IDatabase): void {
         prev_close REAL NOT NULL,
         last_close REAL NOT NULL,
         report_markdown TEXT NOT NULL,
+        model_used TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -116,5 +117,13 @@ export function initSchema(db: IDatabase): void {
   `;
 
   db.exec(schema);
+
+  // Migration for existing tables missing model_used
+  try {
+    db.exec('ALTER TABLE asset_reports ADD COLUMN model_used TEXT;');
+  } catch {
+    // Column already exists or table freshly created
+  }
+
   logger.info('Database schema verified & initialized successfully.');
 }

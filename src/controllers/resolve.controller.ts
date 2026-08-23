@@ -29,7 +29,14 @@ export class ResolveController {
       const result = await isinResolverService.resolve(query);
 
       const isIsinInput = isinResolverService.isIsin(query);
-      const isinVal = isIsinInput ? query.toUpperCase() : undefined;
+      let isinVal = isIsinInput ? query.toUpperCase() : undefined;
+
+      if (!isinVal && result.bestMatch?.symbol) {
+        const foundIsin = await isinResolverService.findIsinForSymbol(result.bestMatch.symbol);
+        if (foundIsin) {
+          isinVal = foundIsin;
+        }
+      }
 
       const bestMatchFormatted = result.bestMatch
         ? {
@@ -62,7 +69,7 @@ export class ResolveController {
         exchange: bestMatchFormatted?.exchange,
         assetType: bestMatchFormatted?.assetType,
         currency: bestMatchFormatted?.currency,
-        isin: isinVal,
+        isin: isinVal || null,
         isValid: result.resolved,
         bestMatch: bestMatchFormatted,
         candidates: candidatesFormatted,

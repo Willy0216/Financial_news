@@ -6,6 +6,61 @@ The application tracks global financial instruments (ETFs, Equities, Indices, Co
 
 ---
 
+## 🚀 Easy 1-Command Startup
+
+### 1. Requirements
+- Node.js `v20+` or `v22+` / `v24+`
+- npm `v10+`
+
+### 2. Installation
+```bash
+# Install root (backend) dependencies
+npm install
+
+# Install client dependencies
+npm --prefix client install
+```
+
+### 3. Environment Configuration
+Copy `.env.example` to `.env` and fill in your keys:
+```bash
+PORT=3000
+NODE_ENV=development
+DATABASE_PATH=./data/finance.db
+
+# Google Gemini API Key (get from https://aistudio.google.com/)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# OpenFIGI API Key (Optional: increases rate limits for ISIN resolution)
+OPENFIGI_API_KEY=
+```
+
+### 4. Running Backend & Frontend Together
+To start **both the Express Backend API (port 3000) and the React Frontend (port 5173)** in a single terminal:
+```bash
+npm run dev
+```
+
+### 5. Running in Production / Standalone
+```bash
+# Build both Server & Frontend
+npm run build
+
+# Start the unified server (Serves both API and Frontend at http://localhost:3000)
+npm start
+```
+
+### 6. Running Tests
+```bash
+# Run unit & service tests
+npm test
+
+# Run all unit, service, and end-to-end API tests
+npm run test:all
+```
+
+---
+
 ## 🏛️ Core Architectural Principles
 
 1. **Zero Trading Logic**: No virtual cash, balances, buy/sell transactions, portfolio cashflows, CMP, or TWR/MWR calculations. Strictly asset tracking, live pricing, interactive charts, and AI report generation.
@@ -13,47 +68,6 @@ The application tracks global financial instruments (ETFs, Equities, Indices, Co
 3. **Resilient AI Pipeline**: Multi-model fallback hierarchy (`gemini-2.5-flash` $\to$ `gemini-2.5-pro` $\to$ `gemini-2.0-flash` $\to$ `gemini-1.5-flash`), 0.00% / closed market skipping, and SQLite caching for fresh daily reports.
 4. **Interactive Financial Visualizations**: Recharts `AreaChart` with gradient fill, timeframe switching (`1W`, `1M`, `6M`, `1Y`, `YTD`), custom tooltips, and responsive layout.
 5. **Universal English Standard**: All code, schemas, variable names, database columns, API payloads, comments, and AI prompts are strictly in English.
-
----
-
-## 🏗️ Project Architecture
-
-```
-Economics Update/
-├── client/                     # React + Vite Frontend
-│   ├── src/
-│   │   ├── api/client.ts       # Typed Axios API Client
-│   │   ├── components/
-│   │   │   ├── Header.tsx      # Top Navigation with branding & status
-│   │   │   ├── SearchBar.tsx   # Debounced 350ms ISIN/Ticker search & Quick-Add
-│   │   │   ├── WatchlistTable.tsx # Main watchlist table with copyable ISINs
-│   │   │   ├── PriceChart.tsx  # Recharts AreaChart with 1W/1M/6M/1Y/YTD
-│   │   │   ├── AIReportPanel.tsx # react-markdown Gemini report viewer
-│   │   │   └── AssetDetailModal.tsx # Deep-dive asset modal
-│   │   ├── types/asset.ts      # TypeScript interfaces
-│   │   ├── App.tsx             # Global application shell & state
-│   │   └── index.css           # Tailwind styling & custom scrollbars
-│   ├── package.json
-│   ├── tailwind.config.js
-│   └── vite.config.ts          # Proxy configuration to :3000
-│
-├── src/                        # Node.js + Express Backend
-│   ├── config/env.ts           # Typed environment config
-│   ├── db/
-│   │   ├── db.ts               # SQLite connection & schema init
-│   │   └── repositories/       # Asset & Report repository CRUD
-│   ├── services/
-│   │   ├── market-data.service.ts # Yahoo Finance quotes & historical chart
-│   │   ├── isin-resolver.service.ts # OpenFIGI + Yahoo search candidate mapping
-│   │   ├── gemini.service.ts   # Google Gen AI SDK multi-model fallback
-│   │   └── report-generator.service.ts # 0% change guard & SQLite caching
-│   ├── controllers/            # Asset, Chart, Report, Resolve controllers
-│   ├── routes/                 # Express router endpoints (/api/*)
-│   └── index.ts                # Express server bootstrap
-│
-├── package.json
-└── tsconfig.json
-```
 
 ---
 
@@ -90,55 +104,6 @@ CREATE INDEX IF NOT EXISTS idx_asset_reports_symbol_date ON asset_reports(symbol
 
 ---
 
-## 🚀 Quick Start
-
-### 1. Requirements
-- Node.js `v20+` or `v22+` / `v24+`
-- npm `v10+`
-
-### 2. Installation
-```bash
-# Install root (backend) dependencies
-npm install
-
-# Install client dependencies
-npm --prefix client install
-```
-
-### 3. Environment Configuration
-Copy `.env.example` to `.env` and fill in your keys:
-```bash
-PORT=3000
-NODE_ENV=development
-DATABASE_PATH=./data/finance.db
-
-# Google Gemini API Key (get from https://aistudio.google.com/)
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# OpenFIGI API Key (Optional: increases rate limits for ISIN resolution)
-OPENFIGI_API_KEY=
-```
-
-### 4. Running Development Servers
-```bash
-# Terminal 1: Start Backend API (Express on http://localhost:3000)
-npm run dev
-
-# Terminal 2: Start Frontend (Vite on http://localhost:5173)
-npm run dev:client
-```
-
-### 5. Production Build
-```bash
-# Build both Backend and Frontend
-npm run build
-
-# Start production server
-npm start
-```
-
----
-
 ## 📡 REST API Reference
 
 All API routes are served under `/api`.
@@ -155,15 +120,3 @@ All API routes are served under `/api`.
 | `GET` | `/api/assets/:symbol/reports` | Returns historical report archive for asset |
 | `POST` | `/api/reports/batch` | Batch generates reports for all tracked assets |
 | `GET` | `/api/health` | Health status and SQLite connectivity check |
-
----
-
-## 🧪 Testing
-
-```bash
-# Run unit & service tests
-npm test
-
-# Run End-to-End API integration tests
-npm run test:e2e
-```

@@ -11,6 +11,7 @@ import {
 import { Loader2, TrendingUp, TrendingDown } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { ChartDataPoint, Timeframe } from '../types/asset';
+import { formatCurrency } from '../utils/formatters';
 
 interface PriceChartProps {
   symbol: string;
@@ -76,7 +77,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
         <div className="bg-gray-900/95 border border-gray-700 p-3 rounded-xl shadow-2xl backdrop-blur-md">
           <p className="text-[11px] font-mono text-gray-400">{label}</p>
           <p className="text-base font-bold font-mono text-gray-100 mt-0.5">
-            {currency} {Number(value).toFixed(2)}
+            {formatCurrency(Number(value), currency, 2)}
           </p>
         </div>
       );
