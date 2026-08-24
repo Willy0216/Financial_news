@@ -595,6 +595,7 @@ export class NewsAggregatorService {
     // Filter noise and clickbait
     const highValueList = uniqueList.filter((item) => this.isHighValueNews(item));
     const pool = highValueList.length >= 2 ? highValueList : uniqueList;
+    
 
     // Score and rank
     const scored = pool.map((item) => ({

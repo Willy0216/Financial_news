@@ -6,6 +6,11 @@ import {
   MacroIndicatorSummary,
   RegimeStatus,
 } from '../types/macro.js';
+import {
+  geminiService,
+  DynamicMacroReportPayload,
+  buildGlobalMacroPrompt,
+} from './gemini.service.js';
 import { logger } from '../utils/logger.js';
 
 // Ensure IPv4 DNS resolution first to avoid Windows Node.js Happy Eyeballs IPv6 timeout
@@ -457,6 +462,66 @@ export class MacroAnalyticsService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Extract typed DynamicMacroReportPayload from live dashboard metrics (SSOT)
+   */
+  public extractMacroReportPayload(metrics: MacroIndicatorSummary[]): DynamicMacroReportPayload {
+    const map = new Map<string, MacroIndicatorSummary>();
+    for (const m of metrics) {
+      map.set(m.key, m);
+    }
+
+    const getMetricValues = (key: string, altKey?: string) => {
+      const item = map.get(key) || (altKey ? map.get(altKey) : undefined);
+      return {
+        value: item?.latestValue ?? 0,
+        zScore: item?.zScore1Y ?? 0,
+        distSma200: item?.distSma200Pct ?? 0,
+      };
+    };
+
+    return {
+      dxy: getMetricValues('DXY'),
+      vix: getMetricValues('VIX'),
+      hyOas: getMetricValues('HY_OAS'),
+      copperGold: getMetricValues('COPPER_GOLD', 'Copper_Gold_Ratio'),
+      dowGold: getMetricValues('DOW_GOLD', 'Dow_Gold_Ratio'),
+      sp500Gold: getMetricValues('SP500_GOLD', 'SP500_Gold_Ratio'),
+    };
+  }
+
+  /**
+   * Get live populated Global Macro Prompt (SSOT)
+   */
+  public async getMacroPrompt(): Promise<string> {
+    const dashboard = await this.getDashboard(false);
+    const payload = this.extractMacroReportPayload(dashboard.metrics);
+    return buildGlobalMacroPrompt(payload);
+  }
+
+  /**
+   * Generate dedicated AI Global Macro synthesis report for Macro Health Dashboard
+   */
+  public async generateMacroReport(customPrompt?: string): Promise<{
+    markdown: string;
+    modelUsed: string;
+    prompt: string;
+  }> {
+    const dashboard = await this.getDashboard(false);
+    const payload = this.extractMacroReportPayload(dashboard.metrics);
+    const prompt =
+      customPrompt && customPrompt.trim().length > 10
+        ? customPrompt.trim()
+        : buildGlobalMacroPrompt(payload);
+
+    const { markdown, modelUsed } = await geminiService.generateMacroReport(
+      payload,
+      customPrompt
+    );
+
+    return { markdown, modelUsed, prompt };
   }
 }
 

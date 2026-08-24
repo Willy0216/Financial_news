@@ -196,6 +196,13 @@ async function runMacroTests() {
     assert(refreshRes.status === 200, 'POST /api/macro-dashboard/refresh returns 200 OK');
     assert(refreshRes.data.success === true, 'Refresh response success is true');
     assert(refreshRes.data.data.metrics.length === 6, 'Refreshed payload has 6 metrics');
+
+    const promptRes = await axios.get(`${API_BASE}/macro-dashboard/prompt`);
+    assert(promptRes.status === 200, 'GET /api/macro-dashboard/prompt returns 200 OK');
+    assert(promptRes.data.success === true, 'Prompt response success is true');
+    assert(promptRes.data.prompt.includes('US Dollar Index (DXY)'), 'Macro prompt contains live DXY values');
+    assert(promptRes.data.prompt.includes('Copper / Gold Ratio (x1000)'), 'Macro prompt contains Copper/Gold ratio');
+    assert(promptRes.data.prompt.includes('CBOE Volatility Index (VIX)'), 'Macro prompt contains VIX');
   } catch (err: any) {
     assert(false, 'API endpoint exception', err.response?.data || err.message);
   } finally {

@@ -22,6 +22,7 @@ export interface UnderlyingProfileData {
   benchmark?: string;
   sector?: string;
   industry?: string;
+  marketCap?: string | number;
   summary?: string;
   topHoldings?: HoldingItem[];
   sectorWeights?: Record<string, number>;

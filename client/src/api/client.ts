@@ -152,6 +152,27 @@ export const apiClient = {
   },
 
   /**
+   * GET /api/macro-dashboard/prompt - Fetch populated global macro prompt (SSOT)
+   */
+  async getMacroPrompt(): Promise<string> {
+    const response = await api.get<{ success: boolean; prompt: string }>(
+      '/macro-dashboard/prompt'
+    );
+    return response.data?.prompt || '';
+  },
+
+  /**
+   * POST /api/macro-dashboard/report - Generate AI Global Macro synthesis
+   */
+  async generateMacroReport(customPrompt?: string): Promise<{ markdown: string; modelUsed: string; prompt: string }> {
+    const response = await api.post<{
+      success: boolean;
+      data: { markdown: string; modelUsed: string; prompt: string };
+    }>('/macro-dashboard/report', { customPrompt }, { timeout: 60000 });
+    return response.data.data;
+  },
+
+  /**
    * GET /api/health - Get backend status
    */
   async getHealth(): Promise<{ status: string; tracked_assets_count: number }> {

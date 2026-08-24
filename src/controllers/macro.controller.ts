@@ -44,6 +44,47 @@ export class MacroController {
       });
     }
   }
+
+  /**
+   * GET /api/macro-dashboard/prompt
+   * Returns populated dynamic global macro prompt (SSOT)
+   */
+  public async getMacroPrompt(_req: Request, res: Response): Promise<void> {
+    try {
+      const prompt = await macroAnalyticsService.getMacroPrompt();
+      res.status(200).json({
+        success: true,
+        prompt,
+      });
+    } catch (error: any) {
+      logger.error('Failed to build macro prompt:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to build macro prompt',
+      });
+    }
+  }
+
+  /**
+   * POST /api/macro-dashboard/report
+   * Generates or custom-generates AI Global Macro synthesis report
+   */
+  public async generateMacroReport(req: Request, res: Response): Promise<void> {
+    try {
+      const { customPrompt } = req.body || {};
+      const result = await macroAnalyticsService.generateMacroReport(customPrompt);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Failed to generate global macro report:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to generate global macro report',
+      });
+    }
+  }
 }
 
 export const macroController = new MacroController();

@@ -129,7 +129,13 @@ async function runE2ETests() {
     const promptRes = await axios.get(`${API_BASE}/assets/AAPL/prompt`);
     assert(promptRes.status === 200, 'GET /api/assets/AAPL/prompt returns 200 OK');
     assert(typeof promptRes.data.prompt === 'string' && promptRes.data.prompt.includes('AAPL'), 'Populated prompt contains symbol AAPL');
-    assert(promptRes.data.prompt.includes('Instrument Metadata'), 'Populated prompt contains Instrument Metadata section');
+    assert(promptRes.data.prompt.includes('Instrument Overview'), 'Populated prompt contains Instrument Overview section');
+
+    // 10b. Get Populated Macro Prompt (GET /api/macro-dashboard/prompt)
+    const macroPromptRes = await axios.get(`${API_BASE}/macro-dashboard/prompt`);
+    assert(macroPromptRes.status === 200, 'GET /api/macro-dashboard/prompt returns 200 OK');
+    assert(macroPromptRes.data.prompt.includes('US Dollar Index (DXY)'), 'Macro prompt contains DXY');
+    assert(macroPromptRes.data.prompt.includes('Copper / Gold Ratio'), 'Macro prompt contains Copper/Gold ratio');
 
     // 11. Batch Reports (POST /api/reports/batch)
     const batchRes = await axios.post(`${API_BASE}/reports/batch`);

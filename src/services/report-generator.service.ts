@@ -1,105 +1,70 @@
 import { assetRepository } from '../db/repositories/asset.repository.js';
 import { reportRepository } from '../db/repositories/report.repository.js';
 import { marketDataService } from './market-data.service.js';
-import { geminiService } from './gemini.service.js';
-import { macroAnalyticsService } from './macro-analytics.service.js';
+import {
+  geminiService,
+  DynamicAssetReportPayload,
+  buildAssetReportPrompt,
+} from './gemini.service.js';
 import { newsAggregatorService } from './news-aggregator.service.js';
-import { ReportGenerationResult, TrackedAsset } from '../types/index.js';
-import { MacroIndicatorSummary } from '../types/macro.js';
+import {
+  ReportGenerationResult,
+  TrackedAsset,
+  UnderlyingProfileData,
+} from '../types/index.js';
 import { logger } from '../utils/logger.js';
+
+export { DynamicAssetReportPayload, buildAssetReportPrompt };
 
 export class ReportGeneratorService {
   /**
-   * Format macroeconomic dashboard indicators for prompt injection
+   * Format underlying exposure / basket dynamics from live profile metadata (Zero hardcoding)
    */
-  public formatMacroIndicators(metrics?: MacroIndicatorSummary[]): string {
-    if (!metrics || metrics.length === 0) {
-      return `- **Global Liquidity & FX**:
-  - **US Dollar Index (DXY)** at 98.80 (-0.20σ, -0.36% vs SMA 200) -> Stable and neutral global FX liquidity conditions.
-- **Market Volatility & Credit Stress**:
-  - **CBOE Volatility Index (VIX)** at 15.13 (-0.95σ, -17.74% vs SMA 200) -> Subdued equity volatility regime, reflecting compressed near-term hedging demand.
-  - **US High Yield Credit Spread (OAS)** at 2.75% (-0.74σ, -3.92% vs SMA 200) -> Benign credit risk premium with no systemic corporate default stress.
-- **Global Growth & Industrial Cycle**:
-  - **Copper / Gold Ratio (x1000)** at 1.41 (+0.75σ, +6.30% vs SMA 200) -> Cyclical economic expansion and firm industrial risk appetite relative to safe-haven assets.
-- **Real-Asset Equity Valuations (Gold Ratios)**:
-  - **S&P 500 / Gold Ratio** at 1.64 (+0.19σ, +3.53% vs SMA 200) -> Resilient broad-market equity strength when benchmarked against monetary gold.
-  - **Dow Jones / Gold Ratio** at 11.38 (+0.15σ, +2.94% vs SMA 200) -> Stable industrial/value asset valuations relative to hard currency reserves.`;
+  public formatUnderlyingContext(
+    profile: UnderlyingProfileData | null,
+    assetType?: string
+  ): string | undefined {
+    if (!profile) return undefined;
+
+    const lines: string[] = [];
+
+    // 1. ETFs & Funds with Top Holdings
+    if (profile.topHoldings && profile.topHoldings.length > 0) {
+      if (profile.family) lines.push(`- **Fund Family**: ${profile.family}`);
+      if (profile.benchmark) lines.push(`- **Benchmark Index**: ${profile.benchmark}`);
+      if (profile.categoryName) lines.push(`- **Category**: ${profile.categoryName}`);
+      lines.push('- **Top Constituent Holdings**:');
+      for (const h of profile.topHoldings) {
+        const weight = h.weightPct !== undefined ? `${h.weightPct.toFixed(2)}%` : 'N/A';
+        lines.push(`  - ${h.name}${h.symbol ? ` (${h.symbol})` : ''}: ${weight}`);
+      }
+      return lines.join('\n');
     }
 
-    const map = new Map<string, MacroIndicatorSummary>();
-    for (const m of metrics) {
-      map.set(m.key, m);
+    // 2. Commodities & Crypto ETCs with Underlying Spot Asset
+    if (profile.underlyingAsset) {
+      lines.push(`- **Underlying Spot Target**: ${profile.underlyingAsset}`);
+      if (profile.benchmark) lines.push(`- **Benchmark Index**: ${profile.benchmark}`);
+      if (profile.categoryName) lines.push(`- **Category**: ${profile.categoryName}`);
+      return lines.join('\n');
     }
 
-    const formatLine = (
-      m: MacroIndicatorSummary | undefined,
-      defaultVal: string,
-      defaultZ: string,
-      defaultDiff: string,
-      unit: string,
-      interpretation: string
-    ) => {
-      if (!m) return `${defaultVal}${unit} (${defaultZ}σ, ${defaultDiff}% vs SMA 200) -> ${interpretation}`;
-      const zSign = (m.zScore1Y ?? 0) >= 0 ? '+' : '';
-      const diffSign = (m.distSma200Pct ?? 0) >= 0 ? '+' : '';
-      const zStr = m.zScore1Y !== null ? `${zSign}${m.zScore1Y.toFixed(2)}σ` : 'N/A';
-      const diffStr = m.distSma200Pct !== null ? `${diffSign}${m.distSma200Pct.toFixed(2)}% vs SMA 200` : 'N/A';
-      return `${m.latestValue.toFixed(2)}${unit} (${zStr}, ${diffStr}) -> ${interpretation}`;
-    };
+    // 3. Single Equities with Sector / Industry / Business Profile
+    if (profile.sector || profile.industry || profile.marketCap || profile.summary) {
+      if (profile.sector) lines.push(`- **Sector**: ${profile.sector}`);
+      if (profile.industry) lines.push(`- **Industry**: ${profile.industry}`);
+      if (profile.marketCap) lines.push(`- **Market Cap**: ${profile.marketCap}`);
+      if (profile.summary) {
+        const summarySnippet =
+          profile.summary.length > 250
+            ? profile.summary.substring(0, 250) + '...'
+            : profile.summary;
+        lines.push(`- **Business Profile**: ${summarySnippet}`);
+      }
+      return lines.join('\n');
+    }
 
-    const dxy = map.get('DXY');
-    const vix = map.get('VIX');
-    const hy = map.get('HY_OAS');
-    const cg = map.get('COPPER_GOLD') || map.get('Copper_Gold_Ratio');
-    const spg = map.get('SP500_GOLD') || map.get('SP500_Gold_Ratio');
-    const dg = map.get('DOW_GOLD') || map.get('Dow_Gold_Ratio');
-
-    const dxyInterp =
-      (dxy?.zScore1Y ?? 0) >= 1.0
-        ? 'Elevated USD strength exerting global liquidity tightness and cross-border currency friction.'
-        : (dxy?.zScore1Y ?? 0) <= -1.0
-        ? 'Weak USD boosting global liquidity and cross-asset risk-taking.'
-        : 'Stable and neutral global FX liquidity conditions.';
-
-    const vixInterp =
-      (vix?.zScore1Y ?? 0) >= 1.5
-        ? 'Acute market stress regime with surging hedging demand and equity risk-off pressure.'
-        : (vix?.zScore1Y ?? 0) >= 0.75
-        ? 'Elevated equity volatility and heightened downside caution.'
-        : 'Subdued equity volatility regime, reflecting compressed near-term hedging demand.';
-
-    const hyInterp =
-      (hy?.zScore1Y ?? 0) >= 1.2
-        ? 'Widening corporate credit risk premium signaling financial tightness.'
-        : 'Benign credit risk premium with no systemic corporate default stress.';
-
-    const cgInterp =
-      (cg?.zScore1Y ?? 0) >= 0.5
-        ? 'Cyclical economic expansion and firm industrial risk appetite relative to safe-haven assets.'
-        : (cg?.zScore1Y ?? 0) <= -0.5
-        ? 'Defensive rotation towards monetary safe havens and slowing industrial demand.'
-        : 'Balanced growth sentiment between industrial metals and safe-haven assets.';
-
-    const spgInterp =
-      (spg?.zScore1Y ?? 0) >= 0.0
-        ? 'Resilient broad-market equity strength when benchmarked against monetary gold.'
-        : 'Defensive gold outperformance relative to broad-market US equities.';
-
-    const dgInterp =
-      (dg?.zScore1Y ?? 0) >= 0.0
-        ? 'Stable industrial/value asset valuations relative to hard currency reserves.'
-        : 'Industrial/value equity compression relative to physical gold.';
-
-    return `- **Global Liquidity & FX**:
-  - **US Dollar Index (DXY)** at ${formatLine(dxy, '98.80', '-0.20', '-0.36', '', dxyInterp)}
-- **Market Volatility & Credit Stress**:
-  - **CBOE Volatility Index (VIX)** at ${formatLine(vix, '15.13', '-0.95', '-17.74', '', vixInterp)}
-  - **US High Yield Credit Spread (OAS)** at ${formatLine(hy, '2.75', '-0.74', '-3.92', '%', hyInterp)}
-- **Global Growth & Industrial Cycle**:
-  - **Copper / Gold Ratio (x1000)** at ${formatLine(cg, '1.41', '+0.75', '+6.30', '', cgInterp)}
-- **Real-Asset Equity Valuations (Gold Ratios)**:
-  - **S&P 500 / Gold Ratio** at ${formatLine(spg, '1.64', '+0.19', '+3.53', '', spgInterp)}
-  - **Dow Jones / Gold Ratio** at ${formatLine(dg, '11.38', '+0.15', '+2.94', '', dgInterp)}`;
+    return undefined;
   }
 
   /**
@@ -168,8 +133,8 @@ export class ReportGeneratorService {
       }
     }
 
-    // 4. Retrieve or extract underlying profile metadata (benchmark, underlyingAsset, etc.)
-    let profile: any = null;
+    // 4. Retrieve or extract underlying profile metadata
+    let profile: UnderlyingProfileData | null = null;
     if (tracked?.underlying_data) {
       try {
         profile = JSON.parse(tracked.underlying_data);
@@ -194,38 +159,29 @@ export class ReportGeneratorService {
     });
     const formattedNews = newsAggregatorService.formatHeadlinesForPrompt(newsItems);
 
-    // 6. Fetch live Macro Indicators for structured prompt injection
-    let macroIndicators: string | undefined;
-    try {
-      const macroDashboard = await macroAnalyticsService.getDashboard();
-      macroIndicators = this.formatMacroIndicators(macroDashboard.metrics);
-    } catch {
-      macroIndicators = this.formatMacroIndicators();
-    }
+    // 6. Build typed DynamicAssetReportPayload (SSOT, zero hardcoded strings)
+    const reportPayload: DynamicAssetReportPayload = {
+      name: tracked?.name || quote.name,
+      symbol: cleanSymbol,
+      isin: tracked?.isin,
+      assetType: tracked?.asset_type || quote.assetType,
+      exchange: tracked?.exchange || quote.exchange,
+      currency: tracked?.currency || quote.currency,
+      lastClose: quote.price,
+      prevClose: quote.prevClose,
+      priceChange: quote.priceChange,
+      priceChangePct: quote.priceChangePct,
+      underlyingContext: this.formatUnderlyingContext(
+        profile,
+        tracked?.asset_type || quote.assetType
+      ),
+      newsContext: formattedNews,
+    };
 
     // 7. Call Gemini with fallback hierarchy
     try {
       const { markdown, modelUsed } = await geminiService.generateReport(
-        {
-          symbol: cleanSymbol,
-          name: tracked?.name || quote.name,
-          isin: tracked?.isin,
-          assetType: tracked?.asset_type || quote.assetType,
-          exchange: tracked?.exchange || quote.exchange,
-          currency: tracked?.currency || quote.currency,
-          lastClose: quote.price,
-          prevClose: quote.prevClose,
-          priceChange: quote.priceChange,
-          priceChangePct: quote.priceChangePct,
-          benchmark: profile?.benchmark,
-          underlyingAsset: profile?.underlyingAsset,
-          sector: profile?.sector,
-          industry: profile?.industry,
-          family: profile?.family,
-          macroIndicators,
-          formattedNews,
-          recentNews: newsItems,
-        },
+        reportPayload,
         options.customPrompt
       );
 
@@ -257,7 +213,7 @@ export class ReportGeneratorService {
   }
 
   /**
-   * Get populated prompt with live asset variables for symbol
+   * Get populated prompt with live asset variables for symbol (SSOT)
    */
   public async getPopulatedPromptForSymbol(symbol: string): Promise<string> {
     const cleanSymbol = symbol.trim().toUpperCase();
@@ -279,7 +235,7 @@ export class ReportGeneratorService {
       };
     }
 
-    let profile: any = null;
+    let profile: UnderlyingProfileData | null = null;
     if (tracked?.underlying_data) {
       try {
         profile = JSON.parse(tracked.underlying_data);
@@ -303,17 +259,9 @@ export class ReportGeneratorService {
     });
     const formattedNews = newsAggregatorService.formatHeadlinesForPrompt(newsItems);
 
-    let macroIndicators: string | undefined;
-    try {
-      const macroDashboard = await macroAnalyticsService.getDashboard();
-      macroIndicators = this.formatMacroIndicators(macroDashboard.metrics);
-    } catch {
-      macroIndicators = this.formatMacroIndicators();
-    }
-
-    return geminiService.buildPrompt({
-      symbol: cleanSymbol,
+    const reportPayload: DynamicAssetReportPayload = {
       name: tracked?.name || quote?.name || cleanSymbol,
+      symbol: cleanSymbol,
       isin: tracked?.isin,
       assetType: tracked?.asset_type || quote?.assetType || 'EQUITY',
       exchange: tracked?.exchange || quote?.exchange || 'N/A',
@@ -322,15 +270,14 @@ export class ReportGeneratorService {
       prevClose: quote?.prevClose ?? 0,
       priceChange: quote?.priceChange ?? 0,
       priceChangePct: quote?.priceChangePct ?? 0,
-      benchmark: profile?.benchmark,
-      underlyingAsset: profile?.underlyingAsset,
-      sector: profile?.sector,
-      industry: profile?.industry,
-      family: profile?.family,
-      macroIndicators,
-      formattedNews,
-      recentNews: newsItems,
-    });
+      underlyingContext: this.formatUnderlyingContext(
+        profile,
+        tracked?.asset_type || quote?.assetType
+      ),
+      newsContext: formattedNews,
+    };
+
+    return buildAssetReportPrompt(reportPayload);
   }
 
   /**
