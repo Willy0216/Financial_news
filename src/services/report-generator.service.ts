@@ -3,6 +3,7 @@ import { reportRepository } from '../db/repositories/report.repository.js';
 import { marketDataService } from './market-data.service.js';
 import { geminiService } from './gemini.service.js';
 import { macroAnalyticsService } from './macro-analytics.service.js';
+import { newsAggregatorService } from './news-aggregator.service.js';
 import { ReportGenerationResult, TrackedAsset } from '../types/index.js';
 import { MacroIndicatorSummary } from '../types/macro.js';
 import { logger } from '../utils/logger.js';
@@ -183,12 +184,15 @@ export class ReportGeneratorService {
       );
     }
 
-    // 5. Fetch targeted news headlines using Underlying Spot Target, Benchmark Index, and Ticker keywords
-    const recentNews = await this.fetchTargetedNews(
-      cleanSymbol,
-      tracked?.name || quote.name,
-      profile
-    );
+    // 5. Fetch fresh multi-tiered news headlines via NewsAggregatorService
+    const newsItems = await newsAggregatorService.fetchNewsForAsset({
+      symbol: cleanSymbol,
+      name: tracked?.name || quote.name,
+      assetType: tracked?.asset_type || quote.assetType,
+      profile,
+      underlying_data: tracked?.underlying_data,
+    });
+    const formattedNews = newsAggregatorService.formatHeadlinesForPrompt(newsItems);
 
     // 6. Fetch live Macro Indicators for structured prompt injection
     let macroIndicators: string | undefined;
@@ -219,7 +223,8 @@ export class ReportGeneratorService {
           industry: profile?.industry,
           family: profile?.family,
           macroIndicators,
-          recentNews,
+          formattedNews,
+          recentNews: newsItems,
         },
         options.customPrompt
       );
@@ -249,98 +254,6 @@ export class ReportGeneratorService {
         reason: err.message || 'Unknown error occurred during AI report generation.',
       };
     }
-  }
-
-  /**
-   * Fetch targeted news headlines using underlying spot target, benchmark index, and ticker keywords
-   */
-  private async fetchTargetedNews(
-    symbol: string,
-    name?: string,
-    profile?: any
-  ): Promise<Array<{ title: string; publisher: string }>> {
-    const queries: string[] = [];
-    const sym = symbol.toUpperCase();
-
-    // 1. Specific targeted keyword based on underlying spot target
-    if (profile?.underlyingAsset) {
-      const lower = profile.underlyingAsset.toLowerCase();
-      if (lower.includes('bitcoin') || sym.includes('BTC') || sym.includes('BITC')) {
-        queries.push('Bitcoin');
-      } else if (lower.includes('ethereum') || sym.includes('ETH')) {
-        queries.push('Ethereum');
-      } else if (
-        lower.includes('gold') ||
-        sym.includes('GOLD') ||
-        sym.includes('SGLN') ||
-        sym.includes('PPFB')
-      ) {
-        queries.push('Gold price');
-      } else if (lower.includes('silver') || sym.includes('SILVER') || sym.includes('SSLN')) {
-        queries.push('Silver price');
-      } else if (lower.includes('copper') || sym.includes('HG=')) {
-        queries.push('Copper commodity');
-      } else if (lower.includes('crude') || sym.includes('CL=')) {
-        queries.push('Crude Oil');
-      } else {
-        const cleaned = profile.underlyingAsset.replace(/\(.*?\)/g, '').trim();
-        if (cleaned) queries.push(cleaned);
-      }
-    }
-
-    // 2. Benchmark index keywords
-    if (profile?.benchmark) {
-      const lower = profile.benchmark.toLowerCase();
-      if (lower.includes('stoxx')) {
-        queries.push('STOXX Europe 600');
-      } else if (lower.includes('s&p 500') || lower.includes('sp500')) {
-        queries.push('S&P 500');
-      } else if (lower.includes('nasdaq')) {
-        queries.push('Nasdaq 100');
-      } else if (!queries.includes(profile.benchmark)) {
-        queries.push(profile.benchmark.trim());
-      }
-    }
-
-    // 3. Raw symbol
-    queries.push(symbol);
-
-    // 4. Asset name without generic fund suffixes
-    if (name && name !== symbol) {
-      const cleanName = name
-        .replace(/UCITS ETF.*$/i, '')
-        .replace(/ETF.*$/i, '')
-        .replace(/ETC.*$/i, '')
-        .replace(/Physical.*$/i, '')
-        .trim();
-      if (cleanName.length > 2 && !queries.includes(cleanName)) {
-        queries.push(cleanName);
-      }
-    }
-
-    const headlineSet = new Set<string>();
-    const results: Array<{ title: string; publisher: string }> = [];
-
-    for (const q of queries) {
-      if (results.length >= 5) break;
-      try {
-        const { news } = await marketDataService.searchYahoo(q, 0, 5);
-        for (const item of news) {
-          if (item.title && !headlineSet.has(item.title.toLowerCase().trim())) {
-            headlineSet.add(item.title.toLowerCase().trim());
-            results.push({
-              title: item.title.trim(),
-              publisher: item.publisher?.trim() || 'Market News',
-            });
-            if (results.length >= 5) break;
-          }
-        }
-      } catch (err: any) {
-        logger.warn(`Failed to search news for query "${q}": ${err.message}`);
-      }
-    }
-
-    return results;
   }
 
   /**
@@ -381,11 +294,14 @@ export class ReportGeneratorService {
       );
     }
 
-    const recentNews = await this.fetchTargetedNews(
-      cleanSymbol,
-      tracked?.name || quote?.name || cleanSymbol,
-      profile
-    );
+    const newsItems = await newsAggregatorService.fetchNewsForAsset({
+      symbol: cleanSymbol,
+      name: tracked?.name || quote?.name || cleanSymbol,
+      assetType: tracked?.asset_type || quote?.assetType || 'EQUITY',
+      profile,
+      underlying_data: tracked?.underlying_data,
+    });
+    const formattedNews = newsAggregatorService.formatHeadlinesForPrompt(newsItems);
 
     let macroIndicators: string | undefined;
     try {
@@ -412,7 +328,8 @@ export class ReportGeneratorService {
       industry: profile?.industry,
       family: profile?.family,
       macroIndicators,
-      recentNews,
+      formattedNews,
+      recentNews: newsItems,
     });
   }
 
@@ -442,7 +359,8 @@ export class ReportGeneratorService {
 
       if (res.status === 'generated') generatedCount++;
       else if (res.status === 'cached') cachedCount++;
-      else if (res.status === 'skipped_zero_change' || res.status === 'skipped_market_closed') skippedCount++;
+      else if (res.status === 'skipped_zero_change' || res.status === 'skipped_market_closed')
+        skippedCount++;
       else if (res.status === 'error') errorCount++;
     }
 

@@ -1,5 +1,15 @@
 export type AssetType = 'ETF' | 'EQUITY' | 'INDEX' | 'COMMODITY';
 
+export interface NewsItem {
+  title: string;
+  summary?: string;
+  publisher: string;
+  link?: string;
+  publishedAt: Date;
+  timeAgo?: string;
+  source?: 'yahoo' | 'google_rss' | 'fallback';
+}
+
 export interface HoldingItem {
   symbol?: string;
   name: string;

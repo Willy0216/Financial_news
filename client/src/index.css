@@ -41,3 +41,20 @@
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Institutional Report Typography */
+.report-markdown-content {
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.report-markdown-content p {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.85;
+}
+
+.report-markdown-content strong {
+  font-weight: 900;
+}
+

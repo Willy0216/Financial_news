@@ -12,9 +12,10 @@
     "build": "tsc && npm --prefix client run build",
     "start": "node dist/index.js",
     "test": "node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/verify.ts",
+    "test:news": "node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/news-aggregator.test.ts",
     "test:e2e": "node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/e2e-api.test.ts",
     "test:macro": "node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/macro-analytics.test.ts",
-    "test:all": "node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/verify.ts && node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/e2e-api.test.ts && node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/macro-analytics.test.ts"
+    "test:all": "node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/verify.ts && node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/news-aggregator.test.ts && node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/e2e-api.test.ts && node --dns-result-order=ipv4first ./node_modules/tsx/dist/cli.mjs tests/macro-analytics.test.ts"
   },
   "keywords": [
     "finance",

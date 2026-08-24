@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Copy, Check, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { X, Copy, Check, TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react';
 import { TrackedAsset } from '../types/asset';
 import { PriceChart } from './PriceChart';
 import { AssetProfileCard } from './AssetProfileCard';
@@ -62,7 +62,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
               {asset.isin && (
                 <button
                   onClick={handleCopyIsin}
-                  className="flex items-center gap-1 text-xs font-mono text-gray-400 bg-gray-800/80 hover:bg-gray-700/80 px-2.5 py-0.5 rounded-md border border-gray-700 transition-colors"
+                  className="flex items-center gap-1 text-xs font-mono text-gray-400 bg-gray-800/80 hover:bg-gray-700/80 px-2.5 py-0.5 rounded-md border border-gray-700 transition-colors cursor-pointer"
                   title="Copy ISIN"
                 >
                   <span>ISIN: {asset.isin}</span>
@@ -106,12 +106,26 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2.5">
+            <a
+              href={`https://finance.yahoo.com/quote/${encodeURIComponent(asset.symbol)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/70 hover:bg-purple-900/90 text-purple-200 hover:text-white border border-purple-800/80 hover:border-purple-600 text-xs font-semibold transition-all shadow-sm hover:shadow-purple-950/60 group cursor-pointer"
+              title={`Open ${asset.symbol} on Yahoo Finance`}
+            >
+              <span className="font-semibold">Yahoo Finance</span>
+              <ExternalLink className="w-3.5 h-3.5 text-purple-400 group-hover:text-purple-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </a>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
+              title="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Scrollable Body */}

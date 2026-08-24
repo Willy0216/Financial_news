@@ -20,7 +20,8 @@ export interface ReportPromptData {
   industry?: string;
   family?: string;
   macroIndicators?: string;
-  recentNews?: Array<{ title: string; publisher: string }>;
+  formattedNews?: string;
+  recentNews?: Array<{ title: string; publisher: string; timeAgo?: string }>;
 }
 
 export class GeminiService {
@@ -49,12 +50,18 @@ export class GeminiService {
    * Build structured prompt for macroeconomic and market driver analysis
    */
   public buildPrompt(data: ReportPromptData): string {
-    const newsSection =
-      data.recentNews && data.recentNews.length > 0
-        ? `\n### Recent News Headlines:\n${data.recentNews
-            .map((n, i) => `${i + 1}. "${n.title}" (${n.publisher})`)
-            .join('\n')}`
-        : '\nNo direct headlines captured. Infer performance drivers from macro correlations, sector beta, and asset-class dynamics.';
+    let newsSection =
+      '\nNo direct headlines captured. Infer performance drivers from macro correlations, sector beta, and asset-class dynamics.';
+
+    if (data.formattedNews && data.formattedNews.trim().length > 0) {
+      newsSection = `\n### Recent News Headlines:\n${data.formattedNews.trim()}`;
+    } else if (data.recentNews && data.recentNews.length > 0) {
+      const items = data.recentNews.map((n) => {
+        const time = n.timeAgo ? ` | ${n.timeAgo}` : '';
+        return `- [${n.publisher}${time}] ${n.title}`;
+      });
+      newsSection = `\n### Recent News Headlines:\n${items.join('\n')}`;
+    }
 
     const sign = data.priceChangePct >= 0 ? '+' : '';
     const formattedChange = `${sign}${data.priceChange.toFixed(2)}`;
@@ -108,6 +115,7 @@ ${metadataLines.join('\n')}
 ### News Feed & Catalysts:
 ${newsSection}
 
+Ignore the useless titles
 ---
 
 ### Analytical Framework & Asset-Specific Heuristics:

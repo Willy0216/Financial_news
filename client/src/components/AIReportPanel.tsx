@@ -344,7 +344,7 @@ export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) =>
             </div>
           </div>
         ) : report?.reportMarkdown ? (
-          <div className="relative">
+          <div className="relative font-['Verdana',Geneva,Tahoma,sans-serif]">
             {refreshing && (
               <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-[2px] rounded-xl flex items-center justify-center z-10 animate-in fade-in duration-150">
                 <div className="flex items-center gap-2 bg-gray-900 border border-gray-700 px-4 py-2 rounded-xl shadow-xl text-xs font-semibold text-indigo-300">
@@ -353,8 +353,77 @@ export const AIReportPanel: React.FC<AIReportPanelProps> = ({ symbol, name }) =>
                 </div>
               </div>
             )}
-            <div className="prose prose-invert max-w-none prose-headings:font-bold prose-headings:text-gray-100 prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-h4:text-sm prose-p:text-gray-300 prose-p:text-sm prose-p:leading-relaxed prose-li:text-gray-300 prose-li:text-sm prose-strong:text-indigo-300 prose-code:font-mono prose-code:text-xs prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
-              <ReactMarkdown>{report.reportMarkdown}</ReactMarkdown>
+            <div className="report-markdown-content text-slate-300">
+              <ReactMarkdown
+                components={{
+                  h1: ({ children }) => (
+                    <h1 className="text-xl font-black text-white mt-8 mb-4 tracking-tight border-b border-gray-800/80 pb-3 flex items-center gap-2">
+                      {children}
+                    </h1>
+                  ),
+                  h2: ({ children }) => (
+                    <h2 className="text-lg font-black text-white mt-8 mb-4 tracking-tight border-b border-gray-800/60 pb-2">
+                      {children}
+                    </h2>
+                  ),
+                  h3: ({ children }) => (
+                    <h3 className="text-base font-extrabold text-indigo-200 mt-6 mb-3 tracking-tight">
+                      {children}
+                    </h3>
+                  ),
+                  h4: ({ children }) => (
+                    <h4 className="text-[14.5px] font-black text-white mt-6 mb-3 tracking-wide flex items-center gap-2">
+                      <span className="w-1.5 h-4 bg-indigo-500 rounded-full inline-block"></span>
+                      {children}
+                    </h4>
+                  ),
+                  p: ({ children }) => (
+                    <p className="my-5 text-[14px] leading-[1.85] font-normal text-slate-300 tracking-[0.01em]">
+                      {children}
+                    </p>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="my-4 space-y-3 list-disc pl-6 text-slate-300 text-[14px] leading-[1.85]">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="my-4 space-y-3 list-decimal pl-6 text-slate-300 text-[14px] leading-[1.85]">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ children }) => (
+                    <li className="font-normal text-slate-300 my-2 leading-[1.85] pl-1">
+                      {children}
+                    </li>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-black text-white bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-500/30 tracking-normal shadow-sm">
+                      {children}
+                    </strong>
+                  ),
+                  em: ({ children }) => (
+                    <em className="italic text-slate-200">
+                      {children}
+                    </em>
+                  ),
+                  blockquote: ({ children }) => (
+                    <blockquote className="my-5 border-l-4 border-indigo-500/80 bg-indigo-950/20 pl-4 py-2 rounded-r text-slate-300 italic text-[14px] leading-[1.8]">
+                      {children}
+                    </blockquote>
+                  ),
+                  hr: () => (
+                    <hr className="my-8 border-gray-800/80" />
+                  ),
+                  code: ({ children }) => (
+                    <code className="font-mono text-xs bg-gray-800/90 text-indigo-200 px-1.5 py-0.5 rounded border border-gray-700">
+                      {children}
+                    </code>
+                  ),
+                }}
+              >
+                {report.reportMarkdown}
+              </ReactMarkdown>
             </div>
           </div>
         ) : (
